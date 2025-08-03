@@ -178,6 +178,8 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
   const audioUrlRef = useRef<string | null>(null);
   const isHoldingRef = useRef(false);
   const holdStartTimeRef = useRef<number | null>(null);
+  const activePointerIdRef = useRef<number | null>(null);
+  const isTouchActiveRef = useRef(false);
   const finalTranscriptRef = useRef('');
 
   useEffect(() => {
@@ -286,64 +288,59 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
     }
   }, []);
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    console.log('Pointer down - starting recording');
-    e.preventDefault();
-    
+  // Unified start handler for pointer/touch
+  const startRecording = (e: any) => {
     // Prevent interaction if disabled
-    if (disabled) {
-      console.log('Sphere is disabled, ignoring pointer down');
-      return;
-    }
-    
-    // Prevent multiple starts
-    if (isHoldingRef.current) {
-      console.log('Already recording, ignoring pointer down');
-      return;
-    }
-    
+    if (disabled) return;
+    if (isHoldingRef.current) return;
     isHoldingRef.current = true;
     holdStartTimeRef.current = Date.now();
+    // Track pointer/touch
+    if (e.pointerId !== undefined) activePointerIdRef.current = e.pointerId;
+    if (e.type === 'touchstart') isTouchActiveRef.current = true;
     setIsListening(true);
     setIsIdle(false);
-    console.log('Sphere state: isListening=true, isIdle=false');
-    
     if (recognitionRef.current && isSupported) {
       try {
-        // Check if recognition is already active
         if (recognitionRef.current.state === 'inactive') {
-          console.log('Starting speech recognition...');
           recognitionRef.current.start();
         }
-        console.log('Starting audio recording...');
         startAudioRecording();
       } catch (error) {
-        console.error('Error starting recognition:', error);
         setIsListening(false);
         setIsIdle(true);
         isHoldingRef.current = false;
         holdStartTimeRef.current = null;
+        activePointerIdRef.current = null;
+        isTouchActiveRef.current = false;
       }
     } else if (!isSupported) {
-      console.log('Speech recognition not supported, starting audio recording only...');
       startAudioRecording();
     }
   };
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    console.log('Pointer up - stopping recording');
-    e.preventDefault();
+  // Unified stop handler for pointer/touch
+  const stopRecording = (e: any) => {
+    // Only stop if we were holding
+    if (!isHoldingRef.current) return;
+    // For pointer events, only stop if pointerId matches
+    if (e.pointerId !== undefined && activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      return;
+    }
+    // For touch events, only stop if touch was active
+    if (e.type && e.type.startsWith('touch') && !isTouchActiveRef.current) {
+      return;
+    }
     isHoldingRef.current = false;
+    activePointerIdRef.current = null;
+    isTouchActiveRef.current = false;
     const now = Date.now();
     const holdStart = holdStartTimeRef.current;
     holdStartTimeRef.current = null;
     const heldForMs = holdStart ? now - holdStart : 0;
     if (heldForMs < 1000) {
-      // Too short, cancel everything and do not send
       setIsListening(false);
       setIsIdle(true);
-      console.log('Hold was too short (' + heldForMs + 'ms), discarding recording.');
-      // Stop audio and speech, but do not call onVoiceInput
       if (recognitionRef.current && isSupported) {
         try {
           recognitionRef.current.abort && recognitionRef.current.abort();
@@ -359,21 +356,15 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
     }
     setIsListening(false);
     setIsIdle(true);
-    console.log('Sphere state: isListening=false, isIdle=true');
-    
     if (recognitionRef.current && isSupported) {
       try {
-        console.log('Stopping speech recognition...');
         recognitionRef.current.stop();
-        console.log('Stopping audio recording...');
         stopAudioRecording();
       } catch (error) {
-        console.error('Error stopping recognition:', error);
         setIsListening(false);
         setIsIdle(true);
       }
     } else {
-      console.log('Stopping audio recording (no speech recognition)...');
       stopAudioRecording();
     }
   };
@@ -383,10 +374,19 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
       className={small ? 'relative flex items-center justify-center select-none w-full h-full' : 'relative flex items-center justify-center select-none'}
       style={small ? {} : { width: 340, height: 340 }}
       {...(!small && !disabled && {
-        onPointerDown: handlePointerDown,
-        onPointerUp: handlePointerUp,
-        onPointerLeave: handlePointerUp,
-        onPointerCancel: handlePointerUp,
+        onPointerDown: startRecording,
+        onPointerUp: stopRecording,
+        // Only stop on pointerleave/cancel if not a touch event
+        onPointerLeave: (e: any) => {
+          if (e.pointerType !== 'touch') stopRecording(e);
+        },
+        onPointerCancel: (e: any) => {
+          if (e.pointerType !== 'touch') stopRecording(e);
+        },
+        // Add touch event handlers for mobile robustness
+        onTouchStart: startRecording,
+        onTouchEnd: stopRecording,
+        onTouchCancel: stopRecording,
       })}
     >
       <Canvas camera={{ position: [0, 0, 3] }} shadows style={small ? { width: '100%', height: '100%' } : {}}>

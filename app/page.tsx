@@ -465,8 +465,8 @@ export default function Home() {
         </div>
 
         {/* Response Box below the sphere */}
-        <div className="w-full max-w-4xl px-4 mb-28">
-          <ResponseBox
+        <div className="w-full max-w-4xl px-4 mb-40">
+          {/* <ResponseBox
             responseText={currentResponse}
             isSpeaking={isSpeaking}
             onClick={() => setShowModal(true)}
@@ -474,7 +474,7 @@ export default function Home() {
             hasAudioResponse={hasAudioResponse}
             onToggleAudio={toggleAudio}
             isAIAudioPlaying={isAIAudioPlaying}
-          />
+          /> */}
         </div>
 
         {/* Response Modal (only when showModal is true) */}
