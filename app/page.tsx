@@ -15,20 +15,40 @@ export interface AIResponse {
 
 export default function Home() {
   const [isListening, setIsListening] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [audioAmplitude, setAudioAmplitude] = useState(0);
 
-  const handleVoiceInput = async (transcript: string) => {
-    if (!transcript.trim()) return;
+  const handleVoiceInput = async (transcript: string, audioBlob?: Blob) => {
+    console.log('Received voice input:', transcript);
+    if (!transcript.trim()) {
+      console.log('Empty transcript, ignoring');
+      return;
+    }
 
     try {
+      console.log('Sending to API...');
+      
+      // Convert audio blob to base64 if available
+      let audioBlobBase64 = null;
+      if (audioBlob) {
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+        audioBlobBase64 = btoa(binaryString);
+        console.log('Audio blob converted to base64, size:', audioBlobBase64.length);
+      }
+
       const response = await fetch('/api/ai/voice', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ transcript }),
+        body: JSON.stringify({ 
+          transcript,
+          audioBlob: audioBlobBase64 
+        }),
       });
 
       if (!response.ok) {
@@ -36,6 +56,7 @@ export default function Home() {
       }
 
       const aiResponse: AIResponse = await response.json();
+      console.log('AI Response:', aiResponse);
       setCurrentResponse(aiResponse.responseText);
 
       // Play audio response
@@ -60,6 +81,7 @@ export default function Home() {
         await audio.play();
       } else {
         // Use Web Speech API for text-to-speech
+        console.log('Playing text-to-speech...');
         setIsSpeaking(true);
         await playTextToSpeech(aiResponse.responseText, (amplitude) => {
           setAudioAmplitude(amplitude);
@@ -88,8 +110,9 @@ export default function Home() {
       {/* AI Avatar Sphere */}
       <div className="flex-1 flex items-center justify-center">
         <Sphere 
-          isIdle={!isListening && !isSpeaking}
+          isIdle={!isHolding && !isSpeaking}
           isSpeaking={isSpeaking}
+          isListening={isHolding}
           amplitude={audioAmplitude}
         />
       </div>
@@ -110,8 +133,23 @@ export default function Home() {
         <VoiceButton
           onVoiceInput={handleVoiceInput}
           isListening={isListening}
+          isHolding={isHolding}
           setIsListening={setIsListening}
+          setIsHolding={setIsHolding}
         />
+        
+        {/* Debug Test Button */}
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => {
+              console.log('Test button clicked');
+              handleVoiceInput('Test message from debug button');
+            }}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Test Voice Input
+          </button>
+        </div>
       </div>
     </main>
   );
