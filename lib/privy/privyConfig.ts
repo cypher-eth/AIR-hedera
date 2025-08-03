@@ -1,5 +1,5 @@
 import type {PrivyClientConfig} from '@privy-io/react-auth';
-import { mainnet } from 'wagmi/chains';
+import { hederaPreviewnet } from 'wagmi/chains';
 
 export const privyConfig: PrivyClientConfig = {
   embeddedWallets: {
@@ -12,8 +12,8 @@ export const privyConfig: PrivyClientConfig = {
     showWalletLoginFirst: true
   },
   loginMethodsAndOrder: {
-    primary: ['email', 'google', 'metamask'],          
+    primary: ['email', 'metamask'],          
   },
-  defaultChain: mainnet,
-  supportedChains: [mainnet],
+  defaultChain: hederaPreviewnet,
+  supportedChains: [hederaPreviewnet],
 };

@@ -32,18 +32,9 @@ export function Header({ status }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-black/20 backdrop-blur-sm border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Logo */}
-          {/* <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">AI</span>
-            </div>
-          </div> */}
-
+        <div className="flex items-center justify-between gap-4">
           {/* Status - Centered */}
-          <div className=" ">
-          {/* <div className="absolute left-1/2 transform -translate-x-1/2"> */}
-
+          <div className="">
             <div className="bg-black/20 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
               <p className="text-center text-sm text-white/80">
                 Status: <span className="font-medium text-white">{status}</span>
@@ -81,6 +72,16 @@ export function Header({ status }: HeaderProps) {
                       <div className="border-t border-white/10"></div>
                     </>
                   )}
+
+                  {/* Four new options */}
+                  <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Join a group</button>
+                  <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Create a challenge</button>
+                  <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Start a breathwork</button>
+                  <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">My account</button>
+
+                  {/* Divider */}
+                  <div className="border-t border-white/10"></div>
+
                   {/* Disconnect Button */}
                   <button
                     onClick={() => {

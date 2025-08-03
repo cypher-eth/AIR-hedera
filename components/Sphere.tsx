@@ -13,124 +13,155 @@ interface SphereProps {
 }
 
 function AnimatedSphere({ isIdle, isSpeaking, isListening, amplitude }: { isIdle: boolean; isSpeaking: boolean; isListening: boolean; amplitude: number; }) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const distortionRef = useRef<THREE.Mesh>(null);
-
+  // Torus rings (as before)
+  const ringRefs = [useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null)];
+  const ringParams: [number, number, string, number][] = [
+    [0.80, 0.12, '#ede9fe', 0.22],
+    [0.86, 0.15, '#c4b5fd', 0.13],
+    [0.93, 0.18, '#a78bfa', 0.09],
+    [1.02, 0.22, '#a21caf', 0.06],
+  ];
+  // Blurred, offset, swirling planes for painterly glow
+  const planeRefs = [useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null), useRef<THREE.Mesh>(null)];
+  // [radius, color, baseOpacity, x, y, z]
+  const planeParams: [number, string, number, number, number, number][] = [
+    [1.16, '#ede9fe', 0.12, 0.08, -0.09, -0.18],
+    [1.36, '#c4b5fd', 0.09, 0.13, 0.11, -0.22],
+    [1.52, '#a78bfa', 0.07, -0.12, 0.18, -0.25],
+    [1.68, '#a21caf', 0.05, 0.18, 0.22, -0.28],
+    [1.84, '#fff', 0.04, 0.22, -0.18, -0.32], // faint white bloom
+  ];
+  // Central faint sphere
+  const sphereRef = useRef<THREE.Mesh>(null);
   useFrame((state) => {
-    if (!meshRef.current) return;
-
     const time = state.clock.getElapsedTime();
-
-    // Base breathing animation for all states
-    const baseBreathing = 1 + Math.sin(time * 0.8) * 0.03;
-    
-    // Subtle floating movement
-    const floatY = Math.sin(time * 0.6) * 0.02;
-    
-    // Surface distortion animation
-    const distortionIntensity = isListening ? 0.15 : isSpeaking ? 0.1 : 0.05;
-    const distortionX = Math.sin(time * 1.2) * distortionIntensity;
-    const distortionY = Math.cos(time * 0.9) * distortionIntensity;
-    const distortionZ = Math.sin(time * 1.5) * distortionIntensity;
-
-    if (isListening) {
-      // Enhanced pulsing animation when listening
-      const pulseScale = baseBreathing * (1 + Math.sin(time * 1.8) * 0.2);
-      meshRef.current.scale.setScalar(pulseScale);
-      meshRef.current.rotation.y = time * 0.15;
-      meshRef.current.rotation.x = Math.sin(time * 0.7) * 0.05;
-      meshRef.current.position.y = floatY;
-      
-      // Add wobble effect
-      meshRef.current.rotation.z = Math.sin(time * 1.1) * 0.03;
-    } else if (isIdle) {
-      // Gentle breathing and floating animation
-      const scale = baseBreathing;
-      meshRef.current.scale.setScalar(scale);
-      meshRef.current.rotation.y = time * 0.08;
-      meshRef.current.rotation.x = Math.sin(time * 0.5) * 0.02;
-      meshRef.current.position.y = floatY;
-      
-      // Subtle wobble
-      meshRef.current.rotation.z = Math.sin(time * 0.6) * 0.01;
-    } else if (isSpeaking) {
-      // Dynamic speaking animation with amplitude
-      const speakScale = baseBreathing * (1 + amplitude * 0.4);
-      const breathScale = 1 + Math.sin(time * 2.2) * 0.03;
-      meshRef.current.scale.setScalar(speakScale * breathScale);
-      meshRef.current.rotation.y = time * 0.4;
-      meshRef.current.rotation.x = Math.sin(time * 3.2) * 0.15;
-      meshRef.current.position.y = floatY + Math.sin(time * 4) * 0.01;
-      
-      // Enhanced wobble for speaking
-      meshRef.current.rotation.z = Math.sin(time * 2.8) * 0.08;
-    }
-
-    // Apply surface distortion
-    if (distortionRef.current) {
-      distortionRef.current.position.x = distortionX;
-      distortionRef.current.position.y = distortionY;
-      distortionRef.current.position.z = distortionZ;
-      distortionRef.current.rotation.x = time * 0.3;
-      distortionRef.current.rotation.y = time * 0.2;
+    // Animate rings (as before, but add 3D tilt)
+    ringRefs.forEach((ref, i) => {
+      const mesh = ref.current;
+      if (!mesh) return;
+      let scale = 1 + Math.sin(time * (1.1 + i * 0.13) + i) * (0.01 + i * 0.01);
+      if (isListening) scale *= 1.04 + Math.sin(time * (1.7 + i * 0.2)) * (0.03 + i * 0.01);
+      if (isSpeaking) scale *= 1 + amplitude * (0.08 + i * 0.01);
+      mesh.scale.setScalar(scale);
+      mesh.rotation.z = time * (0.12 + i * 0.07) * (i % 2 === 0 ? 1 : -1);
+      mesh.rotation.x = Math.sin(time * (0.3 + i * 0.11)) * (0.18 + i * 0.04); // more 3D tilt
+      mesh.rotation.y = Math.cos(time * (0.2 + i * 0.09)) * (0.18 + i * 0.04); // more 3D tilt
+      const geom = mesh.geometry as THREE.TorusGeometry;
+      const pos = geom.attributes.position;
+      const orig = geom.parameters;
+      for (let j = 0; j < pos.count; j++) {
+        const angle = (j / pos.count) * Math.PI * 2;
+        const rMod = 1
+          + 0.02 * Math.sin(angle * (2 + i) + time * (0.7 + i * 0.2))
+          + 0.01 * Math.sin(angle * (5 + i) + time * (1.2 + i * 0.13));
+        const x = Math.cos(angle) * orig.radius * rMod;
+        const y = Math.sin(angle) * orig.radius * rMod;
+        const z = pos.getZ(j);
+        pos.setXYZ(j, x, y, z);
+      }
+      pos.needsUpdate = true;
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = ringParams[i][3] * (isListening ? 1.25 : isSpeaking ? 1.1 : 1);
+    });
+    // Animate planes for swirling, painterly glow
+    planeRefs.forEach((ref, i) => {
+      const mesh = ref.current;
+      if (!mesh) return;
+      let scale = 1 + Math.sin(time * (0.7 + i * 0.17) + i) * (0.04 + i * 0.01);
+      if (isListening) scale *= 1.08 + Math.sin(time * (1.2 + i * 0.13)) * (0.05 + i * 0.01);
+      if (isSpeaking) scale *= 1 + amplitude * (0.06 + i * 0.01);
+      mesh.scale.setScalar(scale);
+      mesh.rotation.z = time * (0.09 + i * 0.05) * (i % 2 === 0 ? 1 : -1);
+      mesh.rotation.x = Math.sin(time * (0.2 + i * 0.09)) * (0.07 + i * 0.01);
+      mesh.position.x = planeParams[i][3] + Math.sin(time * (0.5 + i * 0.2)) * (0.04 + i * 0.01);
+      mesh.position.y = planeParams[i][4] + Math.cos(time * (0.6 + i * 0.15)) * (0.04 + i * 0.01);
+      mesh.position.z = planeParams[i][5];
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = planeParams[i][2] * (isListening ? 1.5 : isSpeaking ? 1.2 : 1);
+    });
+    // Animate faint sphere scale
+    if (sphereRef.current) {
+      let scale = 0.82 + Math.sin(time * 0.9) * 0.04;
+      if (isListening) scale *= 1.04;
+      if (isSpeaking) scale *= 1 + amplitude * 0.04;
+      sphereRef.current.scale.setScalar(scale);
     }
   });
-
   return (
     <>
-      {/* Inner glow sphere for listening state */}
-      {isListening && (
-        <mesh position={[0, 0, 0]} scale={[1.3, 1.3, 1.3]}>
-          <sphereGeometry args={[1, 32, 32]} />
-          <meshBasicMaterial
-            color="#f9a8d4"
-            transparent
-            opacity={0.4}
-          />
-        </mesh>
-      )}
-      
-      {/* Surface distortion layer */}
-      <mesh ref={distortionRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[1.02, 64, 64]} />
-        <meshBasicMaterial
-          color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
-          transparent
-          opacity={0.1}
-          wireframe={false}
-        />
-      </mesh>
-      
-      {/* Main sphere */}
-      <mesh ref={meshRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[1, 64, 64]} />
+      {/* Central faint, glassy sphere for 3D volume */}
+      <mesh ref={sphereRef} position={[0, 0, 0]}>
+        <sphereGeometry args={[1.05, 64, 64]} />
         <meshPhysicalMaterial
-          color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
-          roughness={0.02}
-          metalness={0.15}
-          transmission={0.9}
-          thickness={0.8}
+          color="#fff"
+          roughness={0.18}
+          metalness={0.18}
+          transmission={0.95}
+          thickness={1.2}
           ior={1.4}
           transparent={true}
-          opacity={0.7}
+          opacity={0.18}
           clearcoat={1}
-          clearcoatRoughness={0.02}
-          reflectivity={0.8}
-          emissive={isSpeaking ? "#6366f1" : isListening ? "#f9a8d4" : "#e0e7ef"}
-          emissiveIntensity={isSpeaking ? amplitude * 0.6 : isListening ? 0.3 : 0.1}
+          clearcoatRoughness={0.08}
+          reflectivity={0.7}
+          emissive="#a78bfa"
+          emissiveIntensity={0.08}
         />
       </mesh>
-      
-      {/* Outer glow ring */}
-      <mesh position={[0, 0, 0]} scale={[1.1, 1.1, 1.1]}>
-        <ringGeometry args={[0.95, 1.05, 32]} />
-        <meshBasicMaterial
-          color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
-          transparent
-          opacity={0.2}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
+      {/* Blurred, swirling, painterly planes */}
+      {planeParams.map((params, i) => {
+        const [radius, color, baseOpacity] = params;
+        return (
+          <mesh
+            key={"plane-" + i}
+            ref={planeRefs[i]}
+            position={[0, 0, 0]}
+          >
+            <circleGeometry args={[radius, 64]} />
+            <meshBasicMaterial color={color} transparent opacity={baseOpacity} depthWrite={false} />
+          </mesh>
+        );
+      })}
+      {/* Animated torus rings: innermost uses meshPhysicalMaterial for 3D lighting */}
+      {ringParams.map((params, i) => {
+        const [radius, tube, color, baseOpacity] = params;
+        if (i === 0) {
+          return (
+            <mesh
+              key={"ring-" + i}
+              ref={ringRefs[i]}
+              position={[0, 0, 0]}
+            >
+              <torusGeometry args={[radius, tube, 128, 256]} />
+              <meshPhysicalMaterial
+                color={color}
+                roughness={0.18}
+                metalness={0.18}
+                transmission={0.85}
+                thickness={0.7}
+                ior={1.3}
+                transparent={true}
+                opacity={baseOpacity}
+                clearcoat={1}
+                clearcoatRoughness={0.08}
+                reflectivity={0.7}
+                emissive="#a78bfa"
+                emissiveIntensity={0.12}
+              />
+            </mesh>
+          );
+        }
+        return (
+          <mesh
+            key={"ring-" + i}
+            ref={ringRefs[i]}
+            position={[0, 0, 0]}
+          >
+            <torusGeometry args={[radius, tube, 128, 256]} />
+            <meshBasicMaterial color={color} transparent opacity={baseOpacity} depthWrite={false} />
+          </mesh>
+        );
+      })}
     </>
   );
 }
@@ -146,6 +177,7 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
   const audioBlobRef = useRef<Blob | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const isHoldingRef = useRef(false);
+  const holdStartTimeRef = useRef<number | null>(null);
   const finalTranscriptRef = useRef('');
 
   useEffect(() => {
@@ -271,6 +303,7 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
     }
     
     isHoldingRef.current = true;
+    holdStartTimeRef.current = Date.now();
     setIsListening(true);
     setIsIdle(false);
     console.log('Sphere state: isListening=true, isIdle=false');
@@ -289,6 +322,7 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
         setIsListening(false);
         setIsIdle(true);
         isHoldingRef.current = false;
+        holdStartTimeRef.current = null;
       }
     } else if (!isSupported) {
       console.log('Speech recognition not supported, starting audio recording only...');
@@ -300,6 +334,29 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
     console.log('Pointer up - stopping recording');
     e.preventDefault();
     isHoldingRef.current = false;
+    const now = Date.now();
+    const holdStart = holdStartTimeRef.current;
+    holdStartTimeRef.current = null;
+    const heldForMs = holdStart ? now - holdStart : 0;
+    if (heldForMs < 1000) {
+      // Too short, cancel everything and do not send
+      setIsListening(false);
+      setIsIdle(true);
+      console.log('Hold was too short (' + heldForMs + 'ms), discarding recording.');
+      // Stop audio and speech, but do not call onVoiceInput
+      if (recognitionRef.current && isSupported) {
+        try {
+          recognitionRef.current.abort && recognitionRef.current.abort();
+          stopAudioRecording();
+        } catch (error) {
+          setIsListening(false);
+          setIsIdle(true);
+        }
+      } else {
+        stopAudioRecording();
+      }
+      return;
+    }
     setIsListening(false);
     setIsIdle(true);
     console.log('Sphere state: isListening=false, isIdle=true');
@@ -324,7 +381,7 @@ export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onSta
   return (
     <div
       className={small ? 'relative flex items-center justify-center select-none w-full h-full' : 'relative flex items-center justify-center select-none'}
-      style={small ? {} : { width: 240, height: 240 }}
+      style={small ? {} : { width: 340, height: 340 }}
       {...(!small && !disabled && {
         onPointerDown: handlePointerDown,
         onPointerUp: handlePointerUp,
