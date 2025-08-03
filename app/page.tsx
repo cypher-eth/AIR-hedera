@@ -1,40 +1,136 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { playTextToSpeech, stopTextToSpeech } from '@/lib/audio';
-import { Play, Square, Send } from 'lucide-react';
 import { ResponseModal } from '@/components/ResponseModal';
+import { ResponseBox } from '@/components/ResponseBox';
+import { LoginModal, usePrivy } from '@privy-io/react-auth';
+import { useAccount } from 'wagmi';
+import { Header } from '@/components/Header';
+import { Login } from '@/components/Login';
 
 export type ResponseType = 'info' | 'quiz' | 'correct';
 
 export interface AIResponse {
   responseText: string;
   responseAudioUrl?: string;
+  responseAudioBase64?: string;
+  responseAudio?: string;
   responseType: ResponseType;
   metadata?: any;
 }
 
+// App states for better UX control
+export type AppState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
+
 // Dynamically import Sphere with SSR disabled
 const Sphere = dynamic(() => import('@/components/Sphere').then(mod => mod.Sphere), { ssr: false });
 
+// Helper to convert base64 to Blob
+function b64toBlob(b64Data: string, contentType: string = '', sliceSize: number = 512) {
+  const byteCharacters = atob(b64Data);
+  const byteArrays = [];
+  for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+    const slice = byteCharacters.slice(offset, offset + sliceSize);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, { type: contentType });
+}
+
+// Helper to convert base64 to Blob and play audio
+function playBase64Audio(base64: string, mimeType: string = 'audio/mp3', onAudioCreated?: (audio: HTMLAudioElement) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      // Validate base64 string
+      if (!base64 || typeof base64 !== 'string' || base64.length < 100) {
+        reject(new Error('Invalid or empty base64 audio data'));
+        return;
+      }
+
+      const audioBlob = b64toBlob(base64, mimeType);
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      
+      // Call the callback to store the audio reference
+      onAudioCreated?.(audio);
+      
+      audio.onloadeddata = () => {
+        console.log('Base64 audio loaded successfully, duration:', audio.duration);
+      };
+      
+      audio.onerror = (e) => {
+        console.error('Error playing base64 audio:', e);
+        URL.revokeObjectURL(audioUrl);
+        reject(new Error('Failed to play audio'));
+      };
+      
+      audio.onended = () => {
+        console.log('Base64 audio playback ended');
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
+      
+      audio.play().catch((error) => {
+        console.error('Error starting audio playback:', error);
+        URL.revokeObjectURL(audioUrl);
+        reject(error);
+      });
+    } catch (error) {
+      console.error('Error creating audio from base64:', error);
+      reject(error);
+    }
+  });
+}
+
 export default function Home() {
-  const [isListening, setIsListening] = useState(false);
-  const [isHolding, setIsHolding] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  // Core state
+  const [appState, setAppState] = useState<AppState>('idle');
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [aiDebug, setAiDebug] = useState<any>(null);
   const [audioAmplitude, setAudioAmplitude] = useState(0);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('Ready');
   const [showModal, setShowModal] = useState(false);
+  
+  // Auth state
+  const { user, login, authenticated, ready } = usePrivy();
+  const { address } = useAccount();
+  
+  // Refs for audio control
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const processingRef = useRef(false);
+
+  // Stop any currently playing audio
+  const stopCurrentAudio = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    stopTextToSpeech();
+  }, []);
 
   // Unified function to process audio/transcript with AI
-  const processWithAI = async (transcript: string, audioBlob?: Blob) => {
-    setIsProcessing(true);
-    setStatus('Processing with AI...');
+  const processWithAI = useCallback(async (transcript: string, audioBlob?: Blob) => {
+    // Prevent multiple simultaneous requests
+    if (processingRef.current) {
+      console.log('Request already in progress, ignoring new request');
+      return;
+    }
+
+    processingRef.current = true;
+    setAppState('processing');
+    setStatus('Thinking...');
+    
+    // Stop any currently playing audio
+    stopCurrentAudio();
     
     try {
       // Convert audio blob to base64 if available
@@ -65,41 +161,86 @@ export default function Home() {
       const aiResponse: AIResponse = await response.json();
       console.log('AI Response:', aiResponse);
       
+      // Debug: Log the AI response structure
+      console.log('AI Response structure:', {
+        hasResponseText: !!aiResponse.responseText,
+        hasResponseAudio: !!aiResponse.responseAudio,
+        hasResponseAudioBase64: !!aiResponse.responseAudioBase64,
+        hasResponseAudioUrl: !!aiResponse.responseAudioUrl,
+        responseAudioLength: aiResponse.responseAudio?.length || 0,
+        responseAudioBase64Length: aiResponse.responseAudioBase64?.length || 0,
+        allKeys: Object.keys(aiResponse)
+      });
+
       // Always display the response text
       setCurrentResponse(aiResponse.responseText);
       setAiDebug(aiResponse);
+      setAppState('speaking');
       setStatus('Playing AI response...');
 
-      // Show modal with response
-      setShowModal(true);
-
       // Play audio response if available
-      if (aiResponse.responseAudioUrl) {
-        const audio = new Audio(aiResponse.responseAudioUrl);
-        setIsSpeaking(true);
+      const audioData = aiResponse.responseAudioBase64 || aiResponse.responseAudio;
+      
+      if (audioData && typeof audioData === 'string' && audioData.length > 100) {
+        // Play audio from base64
+        console.log('Found base64 audio data, length:', audioData.length);
+        setStatus('Playing AI audio...');
         
+        try {
+          await playBase64Audio(audioData, 'audio/mp3', (audio) => {
+            currentAudioRef.current = audio;
+          });
+          console.log('Base64 audio played successfully');
+        } catch (error) {
+          console.error('Failed to play base64 audio, falling back to TTS:', error);
+          // Fall back to text-to-speech if base64 audio fails
+          await playTextToSpeech(aiResponse.responseText, (amplitude) => {
+            setAudioAmplitude(amplitude);
+          });
+        } finally {
+          setAppState('idle');
+          setAudioAmplitude(0);
+          setStatus('Ready');
+          currentAudioRef.current = null;
+        }
+      } else if (aiResponse.responseAudioUrl) {
+        // Fallback: try URL-based audio
+        const audio = new Audio(aiResponse.responseAudioUrl);
+        currentAudioRef.current = audio;
+        setIsPlaying(true);
+
         const analyseAudio = () => {
           setAudioAmplitude(Math.random() * 0.5 + 0.3);
         };
-        
+
         const intervalId = setInterval(analyseAudio, 100);
-        
+
         audio.onended = () => {
-          setIsSpeaking(false);
+          setIsPlaying(false);
           setAudioAmplitude(0);
           clearInterval(intervalId);
+          setAppState('idle');
           setStatus('Ready');
+          currentAudioRef.current = null;
         };
-        
+
+        audio.onerror = () => {
+          setIsPlaying(false);
+          setAudioAmplitude(0);
+          clearInterval(intervalId);
+          setAppState('idle');
+          setStatus('Ready');
+          currentAudioRef.current = null;
+        };
+
         await audio.play();
       } else {
         // Use Web Speech API for text-to-speech
-        console.log('Playing text-to-speech...');
-        setIsSpeaking(true);
+        console.log('No valid audio found, using text-to-speech...');
         await playTextToSpeech(aiResponse.responseText, (amplitude) => {
           setAudioAmplitude(amplitude);
         });
-        setIsSpeaking(false);
+        setAppState('idle');
         setAudioAmplitude(0);
         setStatus('Ready');
       }
@@ -114,23 +255,20 @@ export default function Home() {
       console.error('Error processing with AI:', error);
       const errorMessage = 'Sorry, I encountered an error processing your request. Please try again.';
       setCurrentResponse(errorMessage);
+      setAppState('error');
       setStatus('Error occurred');
       
-      // Show modal with error
-      setShowModal(true);
-      
       // Play error message
-      setIsSpeaking(true);
       await playTextToSpeech(errorMessage);
-      setIsSpeaking(false);
+      setAppState('idle');
       setStatus('Ready');
     } finally {
-      setIsProcessing(false);
+      processingRef.current = false;
     }
-  };
+  }, [stopCurrentAudio]);
 
   // Handle voice input from Sphere component
-  const handleVoiceInput = async (transcript: string, audioBlob?: Blob) => {
+  const handleVoiceInput = useCallback(async (transcript: string, audioBlob?: Blob) => {
     console.log('Received voice input:', transcript);
     console.log('Audio blob received:', audioBlob ? `Size: ${audioBlob.size}, Type: ${audioBlob.type}` : 'No audio blob');
     
@@ -147,11 +285,11 @@ export default function Home() {
 
     // Process with AI (even if transcript is empty, n8n can process audio)
     await processWithAI(transcript, audioBlob);
-  };
+  }, [processWithAI, recordingUrl]);
 
   // Handle sending audio-only to AI (for the Send button)
-  const sendAudioToAI = async () => {
-    if (!recordingUrl) return;
+  const sendAudioToAI = useCallback(async () => {
+    if (!recordingUrl || processingRef.current) return;
     
     try {
       // Convert the blob URL back to a blob
@@ -163,25 +301,28 @@ export default function Home() {
     } catch (error) {
       console.error('Error sending audio to AI:', error);
       setCurrentResponse('Sorry, I encountered an error processing your audio. Please try again.');
+      setAppState('error');
       setStatus('Error occurred');
       setShowModal(true);
     }
-  };
+  }, [recordingUrl, processWithAI]);
 
   // Play the last recording
-  const playRecording = async () => {
-    if (recordingUrl && !isPlaying) {
+  const playRecording = useCallback(async () => {
+    if (recordingUrl && !isPlaying && appState === 'idle') {
       const audio = new Audio(recordingUrl);
       setIsPlaying(true);
       audio.onended = () => setIsPlaying(false);
       audio.onerror = () => setIsPlaying(false);
       await audio.play().catch(() => setIsPlaying(false));
     }
-  };
+  }, [recordingUrl, isPlaying, appState]);
 
   // Test n8n workflow
-  const testN8nWorkflow = async () => {
-    setIsProcessing(true);
+  const testN8nWorkflow = useCallback(async () => {
+    if (processingRef.current) return;
+    
+    setAppState('processing');
     setStatus('Testing n8n workflow...');
     
     try {
@@ -201,136 +342,151 @@ export default function Home() {
       if (result.success) {
         setCurrentResponse(`N8N Test Successful! Response keys: ${result.responseKeys.join(', ')}`);
         setAiDebug(result);
-        setShowModal(true);
       } else {
         setCurrentResponse(`N8N Test Failed: ${result.error}`);
         setAiDebug(result);
-        setShowModal(true);
       }
     } catch (error) {
       console.error('Error testing n8n:', error);
       setCurrentResponse('Error testing n8n workflow');
       setShowModal(true);
     } finally {
-      setIsProcessing(false);
+      setAppState('idle');
       setStatus('Ready');
     }
-  };
+  }, []);
 
-  // Toggle speech playback
-  const toggleSpeech = () => {
-    if (isSpeaking) {
-      // Stop speaking
-      setIsSpeaking(false);
+  // Toggle AI audio playback
+  const toggleAudio = useCallback(() => {
+    if (appState === 'speaking') {
+      // Stop audio
+      stopCurrentAudio();
+      setAppState('idle');
       setAudioAmplitude(0);
+      setStatus('Ready');
     } else {
-      // Start speaking
-      if (currentResponse) {
-        setIsSpeaking(true);
-        playTextToSpeech(currentResponse, (amplitude) => {
-          setAudioAmplitude(amplitude);
+      // Start AI audio
+      const audioData = aiDebug?.responseAudioBase64 || aiDebug?.responseAudio;
+      if (audioData && typeof audioData === 'string' && audioData.length > 100 && appState === 'idle') {
+        setAppState('speaking');
+        setStatus('Playing AI audio...');
+        
+        playBase64Audio(audioData, 'audio/mp3', (audio) => {
+          // Store the audio reference so we can stop it later
+          currentAudioRef.current = audio;
         }).then(() => {
-          setIsSpeaking(false);
+          setAppState('idle');
           setAudioAmplitude(0);
+          setStatus('Ready');
+          currentAudioRef.current = null;
+        }).catch((error) => {
+          console.error('Failed to play AI audio:', error);
+          setAppState('idle');
+          setAudioAmplitude(0);
+          setStatus('Ready');
+          currentAudioRef.current = null;
         });
       }
     }
-  };
+  }, [appState, aiDebug, stopCurrentAudio]);
+
+  // Toggle text-to-speech playback
+  const toggleSpeech = useCallback(() => {
+    if (appState === 'speaking') {
+      // Stop speaking
+      stopCurrentAudio();
+      setAppState('idle');
+      setAudioAmplitude(0);
+      setStatus('Ready');
+    } else {
+      // Start speaking
+      if (currentResponse && appState === 'idle') {
+        setAppState('speaking');
+        playTextToSpeech(currentResponse, (amplitude) => {
+          setAudioAmplitude(amplitude);
+        }).then(() => {
+          setAppState('idle');
+          setAudioAmplitude(0);
+          setStatus('Ready');
+        });
+      }
+    }
+  }, [appState, currentResponse, stopCurrentAudio]);
 
   // Modal close handler that also stops speech
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowModal(false);
-    setIsSpeaking(false);
-    setAudioAmplitude(0);
-    stopTextToSpeech();
-  };
+    if (appState === 'speaking') {
+      stopCurrentAudio();
+      setAppState('idle');
+      setAudioAmplitude(0);
+      setStatus('Ready');
+    }
+  }, [appState, stopCurrentAudio]);
+
+  // Handle Sphere state changes
+  const handleSphereStateChange = useCallback((sphereState: 'idle' | 'listening') => {
+    if (sphereState === 'listening' && appState === 'idle') {
+      setAppState('listening');
+    } else if (sphereState === 'idle' && appState === 'listening') {
+      setAppState('idle');
+    }
+  }, [appState]);
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-white text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    return <Login />;
+  }
+
+  // Determine if Sphere should be disabled
+  const isSphereDisabled = appState === 'processing' || appState === 'speaking';
+  const isSpeaking = appState === 'speaking';
+  const hasAudioResponse = !!(aiDebug?.responseAudioBase64 || aiDebug?.responseAudio || aiDebug?.responseAudioUrl);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4">
-      {/* Status Display */}
-      <div className="absolute top-4 left-4 right-4">
-        <div className="bg-black/20 backdrop-blur-sm rounded-lg p-3 border border-white/10">
-          <p className="text-center text-sm text-white/80">
-            Status: <span className="font-medium">{status}</span>
-          </p>
+    <>
+      <Header status={status} />
+      <main className="min-h-screen flex flex-col items-center justify-center p-4">
+
+        {/* AI Avatar Sphere */}
+        <div className="flex-1 flex items-center justify-center w-full max-w-4xl px-4">
+          <Sphere 
+            amplitude={audioAmplitude}
+            onVoiceInput={handleVoiceInput}
+            disabled={isSphereDisabled}
+            onStateChange={handleSphereStateChange}
+          />
         </div>
-      </div>
 
-      {/* AI Avatar Sphere */}
-      <div className="flex-1 flex items-center justify-center">
-        <Sphere 
-          amplitude={audioAmplitude}
-          onVoiceInput={handleVoiceInput}
+        {/* Response Box below the sphere */}
+        <div className="w-full max-w-4xl px-4">
+          <ResponseBox
+            responseText={currentResponse}
+            isSpeaking={isSpeaking}
+            onToggleSpeech={toggleSpeech}
+            onClick={() => setShowModal(true)}
+            disabled={appState === 'processing'}
+            hasAudioResponse={hasAudioResponse}
+            onToggleAudio={toggleAudio}
+          />
+        </div>
+
+        {/* Response Modal (only when showModal is true) */}
+        <ResponseModal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          responseText={currentResponse}
+          isSpeaking={isSpeaking}
+          onToggleSpeech={toggleSpeech}
         />
-      </div>
-
-      {/* Control Buttons */}
-      <div className="flex items-center space-x-4 mb-8">
-        {/* Play Recording Button */}
-        <button
-          className={`
-            relative w-20 h-20 rounded-full font-medium text-white
-            transition-all duration-200 transform
-            ${!recordingUrl
-              ? 'bg-gray-400 cursor-not-allowed shadow-lg shadow-gray-400/50'
-              : isPlaying
-                ? 'bg-green-500 hover:bg-green-600 scale-110 shadow-lg shadow-green-500/50' 
-                : 'bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/50'
-            }
-            cursor-pointer
-            active:scale-95
-          `}
-          onClick={playRecording}
-          disabled={isPlaying || !recordingUrl}
-          title="Play last recording"
-        >
-          {isPlaying ? (
-            <Square className="w-8 h-8 mx-auto" />
-          ) : (
-            <Play className="w-8 h-8 mx-auto" />
-          )}
-          {(isPlaying || !recordingUrl) && (
-            <div className="absolute inset-0 rounded-full bg-green-500 animate-ping opacity-20" />
-          )}
-        </button>
-
-        {/* Send to AI Button */}
-        <button
-          className={`
-            relative w-20 h-20 rounded-full font-medium text-white
-            transition-all duration-200 transform
-            ${!recordingUrl
-              ? 'bg-gray-400 cursor-not-allowed shadow-lg shadow-gray-400/50'
-              : isProcessing
-                ? 'bg-blue-500 scale-110 shadow-lg shadow-blue-500/50' 
-                : 'bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/50'
-            }
-            cursor-pointer
-            active:scale-95
-          `}
-          onClick={sendAudioToAI}
-          disabled={isProcessing || !recordingUrl}
-          title="Send audio to AI"
-        >
-          {isProcessing ? (
-            <div className="w-8 h-8 mx-auto border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Send className="w-8 h-8 mx-auto" />
-          )}
-          {(isProcessing || !recordingUrl) && (
-            <div className="absolute inset-0 rounded-full bg-blue-500 animate-ping opacity-20" />
-          )}
-        </button>
-      </div>
-
-      {/* Response Modal */}
-      <ResponseModal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        responseText={currentResponse}
-        isSpeaking={isSpeaking}
-        onToggleSpeech={toggleSpeech}
-      />
-    </main>
+      </main>
+    </>
   );
 } 

@@ -8,33 +8,71 @@ interface SphereProps {
   amplitude: number;
   onVoiceInput: (transcript: string, audioBlob?: Blob) => void;
   small?: boolean;
+  disabled?: boolean;
+  onStateChange?: (state: 'idle' | 'listening') => void;
 }
 
 function AnimatedSphere({ isIdle, isSpeaking, isListening, amplitude }: { isIdle: boolean; isSpeaking: boolean; isListening: boolean; amplitude: number; }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const distortionRef = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
     if (!meshRef.current) return;
 
     const time = state.clock.getElapsedTime();
 
+    // Base breathing animation for all states
+    const baseBreathing = 1 + Math.sin(time * 0.8) * 0.03;
+    
+    // Subtle floating movement
+    const floatY = Math.sin(time * 0.6) * 0.02;
+    
+    // Surface distortion animation
+    const distortionIntensity = isListening ? 0.15 : isSpeaking ? 0.1 : 0.05;
+    const distortionX = Math.sin(time * 1.2) * distortionIntensity;
+    const distortionY = Math.cos(time * 0.9) * distortionIntensity;
+    const distortionZ = Math.sin(time * 1.5) * distortionIntensity;
+
     if (isListening) {
-      // Pulsing animation when listening (half speed)
-      const pulseScale = 1 + Math.sin(time * 1.5) * 0.15;
+      // Enhanced pulsing animation when listening
+      const pulseScale = baseBreathing * (1 + Math.sin(time * 1.8) * 0.2);
       meshRef.current.scale.setScalar(pulseScale);
-      meshRef.current.rotation.y = time * 0.1;
+      meshRef.current.rotation.y = time * 0.15;
+      meshRef.current.rotation.x = Math.sin(time * 0.7) * 0.05;
+      meshRef.current.position.y = floatY;
+      
+      // Add wobble effect
+      meshRef.current.rotation.z = Math.sin(time * 1.1) * 0.03;
     } else if (isIdle) {
-      // Gentle breathing animation
-      const scale = 1 + Math.sin(time * 0.5) * 0.05;
+      // Gentle breathing and floating animation
+      const scale = baseBreathing;
       meshRef.current.scale.setScalar(scale);
-      meshRef.current.rotation.y = time * 0.1;
+      meshRef.current.rotation.y = time * 0.08;
+      meshRef.current.rotation.x = Math.sin(time * 0.5) * 0.02;
+      meshRef.current.position.y = floatY;
+      
+      // Subtle wobble
+      meshRef.current.rotation.z = Math.sin(time * 0.6) * 0.01;
     } else if (isSpeaking) {
-      // Dynamic speaking animation based on amplitude
-      const speakScale = 1 + amplitude * 0.3;
-      const breathScale = 1 + Math.sin(time * 2) * 0.02;
+      // Dynamic speaking animation with amplitude
+      const speakScale = baseBreathing * (1 + amplitude * 0.4);
+      const breathScale = 1 + Math.sin(time * 2.2) * 0.03;
       meshRef.current.scale.setScalar(speakScale * breathScale);
-      meshRef.current.rotation.y = time * 0.3;
-      meshRef.current.rotation.x = Math.sin(time * 3) * 0.1;
+      meshRef.current.rotation.y = time * 0.4;
+      meshRef.current.rotation.x = Math.sin(time * 3.2) * 0.15;
+      meshRef.current.position.y = floatY + Math.sin(time * 4) * 0.01;
+      
+      // Enhanced wobble for speaking
+      meshRef.current.rotation.z = Math.sin(time * 2.8) * 0.08;
+    }
+
+    // Apply surface distortion
+    if (distortionRef.current) {
+      distortionRef.current.position.x = distortionX;
+      distortionRef.current.position.y = distortionY;
+      distortionRef.current.position.z = distortionZ;
+      distortionRef.current.rotation.x = time * 0.3;
+      distortionRef.current.rotation.y = time * 0.2;
     }
   });
 
@@ -42,39 +80,62 @@ function AnimatedSphere({ isIdle, isSpeaking, isListening, amplitude }: { isIdle
     <>
       {/* Inner glow sphere for listening state */}
       {isListening && (
-        <mesh position={[0, 0, 0]} scale={[1.2, 1.2, 1.2]}>
+        <mesh position={[0, 0, 0]} scale={[1.3, 1.3, 1.3]}>
           <sphereGeometry args={[1, 32, 32]} />
           <meshBasicMaterial
             color="#f9a8d4"
             transparent
-            opacity={0.3}
+            opacity={0.4}
           />
         </mesh>
       )}
+      
+      {/* Surface distortion layer */}
+      <mesh ref={distortionRef} position={[0, 0, 0]}>
+        <sphereGeometry args={[1.02, 64, 64]} />
+        <meshBasicMaterial
+          color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
+          transparent
+          opacity={0.1}
+          wireframe={false}
+        />
+      </mesh>
+      
       {/* Main sphere */}
       <mesh ref={meshRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[1, 32, 32]} />
+        <sphereGeometry args={[1, 64, 64]} />
         <meshPhysicalMaterial
           color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
-          roughness={0.05}
-          metalness={0.1}
-          transmission={0.85}
-          thickness={0.7}
-          ior={1.3}
+          roughness={0.02}
+          metalness={0.15}
+          transmission={0.9}
+          thickness={0.8}
+          ior={1.4}
           transparent={true}
-          opacity={0.65}
+          opacity={0.7}
           clearcoat={1}
-          clearcoatRoughness={0.05}
-          reflectivity={0.5}
-          emissive={isSpeaking ? "#6366f1" : "#000000"}
-          emissiveIntensity={isSpeaking ? amplitude * 0.5 : 0}
+          clearcoatRoughness={0.02}
+          reflectivity={0.8}
+          emissive={isSpeaking ? "#6366f1" : isListening ? "#f9a8d4" : "#e0e7ef"}
+          emissiveIntensity={isSpeaking ? amplitude * 0.6 : isListening ? 0.3 : 0.1}
+        />
+      </mesh>
+      
+      {/* Outer glow ring */}
+      <mesh position={[0, 0, 0]} scale={[1.1, 1.1, 1.1]}>
+        <ringGeometry args={[0.95, 1.05, 32]} />
+        <meshBasicMaterial
+          color={isIdle || isListening ? "#e0e7ef" : "#6366f1"}
+          transparent
+          opacity={0.2}
+          side={THREE.DoubleSide}
         />
       </mesh>
     </>
   );
 }
 
-export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
+export function Sphere({ amplitude, onVoiceInput, small, disabled = false, onStateChange }: SphereProps) {
   const [isIdle, setIsIdle] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -100,6 +161,7 @@ export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
         setIsListening(true);
         setIsIdle(false);
         finalTranscriptRef.current = '';
+        onStateChange?.('listening');
       };
       recognition.onresult = (event: any) => {
         let finalTranscript = '';
@@ -126,11 +188,13 @@ export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
         }
         setIsListening(false);
         setIsIdle(true);
+        onStateChange?.('idle');
         onVoiceInput(finalTranscriptRef.current, audioBlobRef.current || undefined);
       };
       recognition.onerror = (event: any) => {
         setIsListening(false);
         setIsIdle(true);
+        onStateChange?.('idle');
       };
       recognitionRef.current = recognition;
     }
@@ -194,6 +258,12 @@ export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
     console.log('Pointer down - starting recording');
     e.preventDefault();
     
+    // Prevent interaction if disabled
+    if (disabled) {
+      console.log('Sphere is disabled, ignoring pointer down');
+      return;
+    }
+    
     // Prevent multiple starts
     if (isHoldingRef.current) {
       console.log('Already recording, ignoring pointer down');
@@ -255,7 +325,7 @@ export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
     <div
       className={small ? 'relative flex items-center justify-center select-none w-full h-full' : 'relative flex items-center justify-center select-none'}
       style={small ? {} : { width: 240, height: 240 }}
-      {...(!small && {
+      {...(!small && !disabled && {
         onPointerDown: handlePointerDown,
         onPointerUp: handlePointerUp,
         onPointerLeave: handlePointerUp,
@@ -269,11 +339,13 @@ export function Sphere({ amplitude, onVoiceInput, small }: SphereProps) {
       </Canvas>
       {/* Glow effect */}
       <div className={`absolute inset-0 rounded-full blur-xl -z-10 transition-all duration-500 ${
-        isListening 
-          ? 'bg-gradient-to-r from-pink-200/40 to-pink-400/40 scale-110' 
-          : isSpeaking 
-            ? 'bg-gradient-to-r from-purple-400/20 to-blue-400/20' 
-            : 'bg-gradient-to-r from-pink-200/20 to-pink-100/20'
+        disabled
+          ? 'bg-gradient-to-r from-gray-400/20 to-gray-300/20 opacity-50'
+          : isListening 
+            ? 'bg-gradient-to-r from-pink-200/40 to-pink-400/40 scale-110' 
+            : isSpeaking 
+              ? 'bg-gradient-to-r from-purple-400/20 to-blue-400/20' 
+              : 'bg-gradient-to-r from-pink-200/20 to-pink-100/20'
       }`} />
       {/* Additional glow layers for listening state */}
       {isListening && (
