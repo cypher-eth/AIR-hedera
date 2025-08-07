@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "deploy:credit": "forge script script/DeployCredit.s.sol:DeployCredit --rpc-url https://testnet.hashio.io/api --broadcast",
+    "deploy:gmnft": "forge script script/DeployGMNFT.s.sol:DeployGMNFT --rpc-url https://testnet.hashio.io/api --broadcast",
+    "build:contracts": "forge build",
+    "test:contracts": "forge test"
   },
   "dependencies": {
     "@privy-io/react-auth": "^2.17.3",

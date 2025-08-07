@@ -3,11 +3,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { parseAbiItem } from 'viem';
-import { GMNFT_ADDRESS } from '@/app/constants/contracts';
+import { GMNFT_ADDRESS, CREDIT_ADDRESS } from '@/app/constants/contracts';
+import { usePrivy } from '@privy-io/react-auth';
 
 export function GMButton() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
+  const { login, authenticated } = usePrivy();
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
   const [notificationType, setNotificationType] = useState<'success' | 'error' | 'info'>('info');
@@ -36,6 +38,17 @@ export function GMButton() {
     },
   });
 
+  // Read CREDIT token balance
+  const { data: creditBalance, refetch: refetchCreditBalance } = useReadContract({
+    address: CREDIT_ADDRESS,
+    abi: [parseAbiItem('function balanceOf(address owner) view returns (uint256)')],
+    functionName: 'balanceOf',
+    args: [address!],
+    query: {
+      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+
   const { writeContractAsync, isPending: isMinting, data: tx, error: writeError } = useWriteContract();
   const { data: receipt, isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: tx });
 
@@ -60,6 +73,13 @@ export function GMButton() {
       canMintError,
       writeError
     });
+
+    // Check if user is authenticated, if not prompt for login
+    if (!authenticated) {
+      showNotificationMessage('Please connect your wallet to mint GM NFTs', 'info');
+      login();
+      return;
+    }
 
     if (!isConnected || !address) {
       showNotificationMessage('Please connect your wallet first', 'error');
@@ -151,12 +171,15 @@ export function GMButton() {
 
   useEffect(() => {
     if (receipt && !isConfirming && !hasShownSuccess) {
-      showNotificationMessage('🎉 GM NFT minted successfully!', 'success');
+      showNotificationMessage('🎉 GM NFT minted successfully! +10 CREDIT tokens earned!', 'success');
       setHasShownSuccess(true);
-      // Refetch canMint status after successful mint
-      setTimeout(() => refetch(), 2000);
+      // Refetch canMint status and credit balance after successful mint
+      setTimeout(() => {
+        refetch();
+        refetchCreditBalance();
+      }, 2000);
     }
-  }, [receipt, isConfirming, hasShownSuccess, refetch]);
+  }, [receipt, isConfirming, hasShownSuccess, refetch, refetchCreditBalance]);
 
   useEffect(() => {
     setHasShownSuccess(false);
@@ -224,6 +247,8 @@ export function GMButton() {
             <div><strong>Can Mint:</strong> {canMint === null ? 'Unknown' : canMint ? 'Yes' : 'No'}</div>
             <div><strong>Loading:</strong> {isLoadingCanMint ? 'Yes' : 'No'}</div>
             <div><strong>Contract Address:</strong> {GMNFT_ADDRESS}</div>
+            <div><strong>CREDIT Balance:</strong> {creditBalance ? `${creditBalance.toString()} CREDIT` : 'Loading...'}</div>
+            <div><strong>CREDIT Address:</strong> {CREDIT_ADDRESS}</div>
             {contractError && (
               <div className="text-red-400"><strong>Contract Error:</strong> {contractError.message}</div>
             )}

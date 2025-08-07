@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./CREDIT.sol";
 
 /**
  * @title GMNft
- * @dev ERC721 NFT contract that allows users to mint one NFT per day
+ * @dev ERC721 NFT contract that allows users to mint one NFT per day and receive CREDIT tokens
  */
 contract GMNft is ERC721, Ownable {
     uint256 private _tokenIds;
@@ -23,9 +24,16 @@ contract GMNft is ERC721, Ownable {
     // Base URI for token metadata
     string private _baseTokenURI;
     
+    // CREDIT token contract reference
+    CREDIT public creditToken;
+    
+    // Amount of CREDIT tokens to mint per NFT mint
+    uint256 public constant CREDIT_PER_MINT = 10;
+    
     // Events
-    event NFTMinted(address indexed to, uint256 indexed tokenId);
+    event NFTMinted(address indexed to, uint256 indexed tokenId, uint256 creditsMinted);
     event BaseURIUpdated(string newBaseURI);
+    event CreditTokenUpdated(address indexed newCreditToken);
     
     /**
      * @dev Constructor
@@ -33,18 +41,21 @@ contract GMNft is ERC721, Ownable {
      * @param _symbol Symbol of the NFT collection
      * @param _maxSupply Maximum number of NFTs that can be minted
      * @param _initialOwner Initial owner of the contract
+     * @param _creditToken Address of the CREDIT token contract
      */
     constructor(
         string memory _name,
         string memory _symbol,
         uint256 _maxSupply,
-        address _initialOwner
+        address _initialOwner,
+        address _creditToken
     ) ERC721(_name, _symbol) Ownable(_initialOwner) {
         maxSupply = _maxSupply;
+        creditToken = CREDIT(_creditToken);
     }
     
     /**
-     * @dev Mint a new NFT. Can only be called once per day per user.
+     * @dev Mint a new NFT and receive CREDIT tokens. Can only be called once per day per user.
      */
     function mint() external {
         require(_tokenIds < maxSupply, "GMNFT: Max supply reached");
@@ -56,7 +67,10 @@ contract GMNft is ERC721, Ownable {
         _mint(msg.sender, newTokenId);
         _lastMintTime[msg.sender] = block.timestamp;
         
-        emit NFTMinted(msg.sender, newTokenId);
+        // Mint CREDIT tokens to the user
+        creditToken.mint(msg.sender, CREDIT_PER_MINT);
+        
+        emit NFTMinted(msg.sender, newTokenId, CREDIT_PER_MINT);
     }
     
     /**
@@ -152,6 +166,32 @@ contract GMNft is ERC721, Ownable {
         }
         
         return string(buffer);
+    }
+    
+    /**
+     * @dev Set the CREDIT token contract address
+     * @param _creditToken New CREDIT token contract address
+     */
+    function setCreditToken(address _creditToken) external onlyOwner {
+        creditToken = CREDIT(_creditToken);
+        emit CreditTokenUpdated(_creditToken);
+    }
+    
+    /**
+     * @dev Get the amount of CREDIT tokens that will be minted per NFT mint
+     * @return Amount of CREDIT tokens per mint
+     */
+    function getCreditPerMint() external pure returns (uint256) {
+        return CREDIT_PER_MINT;
+    }
+    
+    /**
+     * @dev Get the current CREDIT token balance of a user
+     * @param user Address to check
+     * @return CREDIT token balance
+     */
+    function getCreditBalance(address user) external view returns (uint256) {
+        return creditToken.balanceOf(user);
     }
     
 } 

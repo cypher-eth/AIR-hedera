@@ -4,10 +4,9 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { ResponseModal } from '@/components/ResponseModal';
 import { ResponseBox } from '@/components/ResponseBox';
-import { LoginModal, usePrivy } from '@privy-io/react-auth';
+import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
 import { Header } from '@/components/Header';
-import { Login } from '@/components/Login';
 import { GMButton } from '@/components/GMButton';
 import { SaveButton } from '@/components/SaveButton';
 
@@ -103,7 +102,7 @@ export default function Home() {
   // Audio state management
   const [isAIAudioPlaying, setIsAIAudioPlaying] = useState(false);
   
-  // Auth state
+  // Auth state - but don't require authentication
   const { user, login, authenticated, ready } = usePrivy();
   const { address } = useAccount();
   
@@ -408,8 +407,6 @@ export default function Home() {
     }
   }, [aiDebug, stopCurrentAudio, isAIAudioPlaying]);
 
-
-
   // Modal close handler that also stops speech
   const handleCloseModal = useCallback(() => {
     setShowModal(false);
@@ -430,6 +427,7 @@ export default function Home() {
     }
   }, [appState]);
 
+  // Show loading screen only while Privy is initializing
   if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -438,17 +436,11 @@ export default function Home() {
     );
   }
 
-  if (!authenticated) {
-    return <Login />;
-  }
-
   // Determine if Sphere should be disabled
   const isSphereDisabled = appState === 'processing' || appState === 'speaking';
   const isSpeaking = isAIAudioPlaying;
   const hasAudioResponse = !!(aiDebug?.responseAudioBase64 || aiDebug?.responseAudio || aiDebug?.responseAudioUrl);
   
-
-
   return (
     <>
       <Header status={status} />
