@@ -4,6 +4,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useAccount } from 'wagmi';
 import { LogOut, User, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface HeaderProps {
   status: string;
@@ -14,6 +15,7 @@ export function Header({ status }: HeaderProps) {
   const { address } = useAccount();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -26,6 +28,11 @@ export function Header({ status }: HeaderProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleNavigation = (path: string) => {
+    setIsDropdownOpen(false);
+    router.push(path);
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-black/20 backdrop-blur-sm border-b border-white/10">
@@ -73,8 +80,18 @@ export function Header({ status }: HeaderProps) {
                     )}
 
                     {/* Four new options */}
-                    <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Join a group</button>
-                    <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Create a challenge</button>
+                    <button 
+                      onClick={() => handleNavigation('/')}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors"
+                    >
+                      Home
+                    </button>
+                    <button 
+                      onClick={() => handleNavigation('/send')}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors"
+                    >
+                      Send
+                    </button>
                     <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Start a breathwork</button>
                     <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">My account</button>
 

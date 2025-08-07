@@ -6,6 +6,20 @@ import { parseAbiItem } from 'viem';
 import { GMNFT_ADDRESS, CREDIT_ADDRESS } from '@/app/constants/contracts';
 import { usePrivy } from '@privy-io/react-auth';
 
+// Define the complete ABI for better contract interaction
+const GMNFT_ABI = [
+  parseAbiItem('function canMint(address user) view returns (bool)'),
+  parseAbiItem('function mint()'),
+  parseAbiItem('function getCurrentTokenId() view returns (uint256)'),
+  parseAbiItem('function getLastMintTime(address user) view returns (uint256)'),
+  parseAbiItem('function getTimeUntilNextMint(address user) view returns (uint256)'),
+];
+
+const CREDIT_ABI = [
+  parseAbiItem('function balanceOf(address owner) view returns (uint256)'),
+  parseAbiItem('function mint(address to, uint256 amount)'),
+];
+
 export function GMButton() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
@@ -17,35 +31,55 @@ export function GMButton() {
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [contractExists, setContractExists] = useState<boolean | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [isContractLoading, setIsContractLoading] = useState(true);
+  const [contractLoadTimeout, setContractLoadTimeout] = useState<NodeJS.Timeout | null>(null);
 
   // Check if contract exists by trying to read its code
-  const { data: contractCode, error: contractError } = useReadContract({
+  const { data: contractCode, error: contractError, isLoading: isContractCodeLoading } = useReadContract({
     address: GMNFT_ADDRESS,
-    abi: [parseAbiItem('function name() view returns (string)')],
-    functionName: 'name',
+    abi: GMNFT_ABI,
+    functionName: 'getCurrentTokenId',
     query: {
       enabled: !!address && isConnected,
+      retry: 1, // Reduce retries to fail faster
+      retryDelay: 1000,
+    },
+  });
+
+  // Fallback: Try a simpler contract check
+  const { data: fallbackContractCheck, error: fallbackError } = useReadContract({
+    address: GMNFT_ADDRESS,
+    abi: [parseAbiItem('function maxSupply() view returns (uint256)')],
+    functionName: 'maxSupply',
+    query: {
+      enabled: !!address && isConnected && contractExists === false,
+      retry: 1,
+      retryDelay: 1000,
     },
   });
 
   const { data: canMint, isLoading: isLoadingCanMint, refetch, error: canMintError } = useReadContract({
     address: GMNFT_ADDRESS,
-    abi: [parseAbiItem('function canMint(address user) view returns (bool)')],
+    abi: GMNFT_ABI,
     functionName: 'canMint',
     args: [address!],
     query: {
-      enabled: !!address && isConnected && contractExists !== false,
+      enabled: !!address && isConnected && (contractExists !== false || fallbackContractCheck !== undefined),
+      retry: 1,
+      retryDelay: 1000,
     },
   });
 
   // Read CREDIT token balance
   const { data: creditBalance, refetch: refetchCreditBalance } = useReadContract({
     address: CREDIT_ADDRESS,
-    abi: [parseAbiItem('function balanceOf(address owner) view returns (uint256)')],
+    abi: CREDIT_ABI,
     functionName: 'balanceOf',
     args: [address!],
     query: {
-      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
+      enabled: !!address && isConnected,
+      retry: 1,
+      retryDelay: 1000,
     },
   });
 
@@ -58,6 +92,31 @@ export function GMButton() {
     setShowNotification(true);
     setTimeout(() => setShowNotification(false), 5000);
   };
+
+  // Set a timeout to prevent infinite loading
+  useEffect(() => {
+    if (isContractLoading) {
+      const timeout = setTimeout(() => {
+        console.log('Contract loading timeout - marking as failed');
+        setIsContractLoading(false);
+        setContractExists(false);
+      }, 10000); // 10 second timeout
+      
+      setContractLoadTimeout(timeout);
+      
+      return () => {
+        if (timeout) clearTimeout(timeout);
+      };
+    }
+  }, [isContractLoading]);
+
+  // Clear timeout when contract loads successfully
+  useEffect(() => {
+    if (contractLoadTimeout && (contractCode !== undefined || contractError)) {
+      clearTimeout(contractLoadTimeout);
+      setContractLoadTimeout(null);
+    }
+  }, [contractCode, contractError, contractLoadTimeout]);
 
   const handleGMClick = async () => {
     console.log('GM Button clicked');
@@ -93,7 +152,7 @@ export function GMButton() {
     }
 
     if (contractExists === false) {
-      showNotificationMessage('Contract not found on this network. Please check the contract address.', 'error');
+      showNotificationMessage('Contract not found on this network. The contracts may still be deploying. Please try again in a few minutes.', 'error');
       return;
     }
 
@@ -104,7 +163,7 @@ export function GMButton() {
 
     if (canMintError) {
       console.error('CanMint error:', canMintError);
-      showNotificationMessage(`Contract error: ${canMintError.message}`, 'error');
+      showNotificationMessage(`Contract error: ${canMintError.message}. The contracts may still be deploying.`, 'error');
       return;
     }
 
@@ -117,7 +176,7 @@ export function GMButton() {
       console.log('Attempting to mint GM NFT...');
       const result = await writeContractAsync({
         address: GMNFT_ADDRESS,
-        abi: [parseAbiItem('function mint()')],
+        abi: GMNFT_ABI,
         functionName: 'mint',
       });
       console.log('Mint transaction sent:', result);
@@ -134,7 +193,7 @@ export function GMButton() {
         } else if (error.message.includes('network')) {
           errorMessage = 'Network error. Please check your connection and try again.';
         } else if (error.message.includes('contract')) {
-          errorMessage = 'Contract interaction failed. Please check if the contract exists on this network.';
+          errorMessage = 'Contract interaction failed. The contracts may still be deploying. Please try again in a few minutes.';
         } else {
           errorMessage = `Transaction failed: ${error.message}`;
         }
@@ -146,13 +205,21 @@ export function GMButton() {
 
   // Update contract existence status
   useEffect(() => {
-    if (contractError) {
+    if (contractError && fallbackError) {
       console.error('Contract error:', contractError);
+      console.error('Fallback error:', fallbackError);
       setContractExists(false);
-    } else if (contractCode !== undefined) {
+      setIsContractLoading(false);
+    } else if (contractCode !== undefined || fallbackContractCheck !== undefined) {
+      console.log('Contract detected via:', contractCode !== undefined ? 'primary' : 'fallback');
       setContractExists(true);
+      setIsContractLoading(false);
+    } else if (!isContractCodeLoading && !isContractLoading) {
+      // If not loading anymore and no result, mark as failed
+      setContractExists(false);
+      setIsContractLoading(false);
     }
-  }, [contractCode, contractError]);
+  }, [contractCode, contractError, fallbackContractCheck, fallbackError, isContractCodeLoading, isContractLoading]);
 
   // Update debug info
   useEffect(() => {
@@ -193,7 +260,15 @@ export function GMButton() {
     }
   }, [writeError]);
 
-  if (!isConnected) return null;
+  // Reset loading state when connection changes
+  useEffect(() => {
+    if (!isConnected) {
+      setIsContractLoading(false);
+      setContractExists(null);
+    } else {
+      setIsContractLoading(true);
+    }
+  }, [isConnected]);
 
   return (
     <>
@@ -204,7 +279,7 @@ export function GMButton() {
             e.preventDefault();
             setShowDebug(!showDebug);
           }}
-          disabled={isMinting || isConfirming || isLoadingCanMint || contractExists === false}
+          disabled={isMinting || isConfirming || isLoadingCanMint || contractExists === false || isContractLoading}
           className="focus:outline-none cursor-pointer flex items-center justify-center transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: 'transparent',
@@ -213,7 +288,7 @@ export function GMButton() {
             padding: 0,
             position: 'relative',
           }}
-          title={`${debugInfo}${isMinting ? ' | Minting...' : ''}${isConfirming ? ' | Confirming...' : ''}${contractExists === false ? ' | Contract not found' : ''} (Right-click for debug)`}
+          title={`${debugInfo}${isMinting ? ' | Minting...' : ''}${isConfirming ? ' | Confirming...' : ''}${contractExists === false ? ' | Contract not found' : ''}${isContractLoading ? ' | Loading contracts...' : ''} (Right-click for debug)`}
         >
           <img
             src="/morning.png"
@@ -221,7 +296,7 @@ export function GMButton() {
             width={56}
             height={56}
             className="block"
-            style={{ display: 'block', opacity: isMinting || isConfirming || contractExists === false ? 0.6 : 1 }}
+            style={{ display: 'block', opacity: isMinting || isConfirming || contractExists === false || isContractLoading ? 0.6 : 1 }}
           />
           {(isMinting || isConfirming) && (
             <span className="absolute inset-0 flex items-center justify-center">
@@ -231,6 +306,11 @@ export function GMButton() {
           {contractExists === false && (
             <span className="absolute inset-0 flex items-center justify-center">
               <span className="text-red-500 text-xs">!</span>
+            </span>
+          )}
+          {isContractLoading && (
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="text-blue-500 text-xs">⏳</span>
             </span>
           )}
         </button>
@@ -244,6 +324,8 @@ export function GMButton() {
             <div><strong>Connected:</strong> {isConnected ? 'Yes' : 'No'}</div>
             <div><strong>Address:</strong> {address?.slice(0, 6)}...{address?.slice(-4)}</div>
             <div><strong>Contract Exists:</strong> {contractExists === null ? 'Checking...' : contractExists ? 'Yes' : 'No'}</div>
+            <div><strong>Contract Loading:</strong> {isContractLoading ? 'Yes' : 'No'}</div>
+            <div><strong>Contract Code Loading:</strong> {isContractCodeLoading ? 'Yes' : 'No'}</div>
             <div><strong>Can Mint:</strong> {canMint === null ? 'Unknown' : canMint ? 'Yes' : 'No'}</div>
             <div><strong>Loading:</strong> {isLoadingCanMint ? 'Yes' : 'No'}</div>
             <div><strong>Contract Address:</strong> {GMNFT_ADDRESS}</div>
@@ -256,12 +338,62 @@ export function GMButton() {
               <div className="text-red-400"><strong>CanMint Error:</strong> {canMintError.message}</div>
             )}
           </div>
-          <button
-            onClick={() => setShowDebug(false)}
-            className="mt-2 text-blue-400 hover:text-blue-300"
-          >
-            Close
-          </button>
+          <div className="mt-2 space-x-2">
+            <button
+              onClick={() => {
+                setIsContractLoading(true);
+                setContractExists(null);
+                refetch();
+                refetchCreditBalance();
+              }}
+              className="text-blue-400 hover:text-blue-300"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                setIsContractLoading(false);
+                setContractExists(false);
+              }}
+              className="text-yellow-400 hover:text-yellow-300"
+            >
+              Force Stop Loading
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  // Manual contract verification
+                  const response = await fetch('https://testnet.hashio.io/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      jsonrpc: '2.0',
+                      method: 'eth_getCode',
+                      params: [GMNFT_ADDRESS, 'latest'],
+                      id: 1
+                    })
+                  });
+                  const data = await response.json();
+                  console.log('Manual contract check:', data);
+                  if (data.result && data.result !== '0x') {
+                    setContractExists(true);
+                    setIsContractLoading(false);
+                  }
+                } catch (error) {
+                  console.error('Manual verification failed:', error);
+                }
+              }}
+              className="text-green-400 hover:text-green-300"
+            >
+              Verify Contract
+            </button>
+            <button
+              onClick={() => setShowDebug(false)}
+              className="text-gray-400 hover:text-gray-300"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
 

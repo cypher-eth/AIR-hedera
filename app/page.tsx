@@ -5,10 +5,12 @@ import dynamic from 'next/dynamic';
 import { ResponseModal } from '@/components/ResponseModal';
 import { ResponseBox } from '@/components/ResponseBox';
 import { usePrivy } from '@privy-io/react-auth';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
+import { parseAbiItem } from 'viem';
 import { Header } from '@/components/Header';
 import { GMButton } from '@/components/GMButton';
 import { SaveButton } from '@/components/SaveButton';
+import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 
 export type ResponseType = 'info' | 'quiz' | 'correct';
 
@@ -104,8 +106,19 @@ export default function Home() {
   
   // Auth state - but don't require authentication
   const { user, login, authenticated, ready } = usePrivy();
-  const { address } = useAccount();
-  
+  const { address, isConnected } = useAccount();
+
+    // Read CREDIT token balance
+  const { data: creditBalance } = useReadContract({
+    address: CREDIT_ADDRESS,
+    abi: [parseAbiItem('function balanceOf(address owner) view returns (uint256)')],
+    functionName: 'balanceOf',
+    args: [address!],
+    query: {
+      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
+    },
+  });
+
   // Refs for audio control
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const processingRef = useRef(false);
@@ -480,7 +493,9 @@ export default function Home() {
         <SaveButton />
         {/* Faint instruction text between the two buttons */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20 select-none pointer-events-none">
-          <span className="text-[#6d28d9]/50 font-bold tracking-wide text-lg">hold sphere to talk</span>
+          <span className="text-[#6d28d9]/50 font-bold tracking-wide text-lg">
+            hold sphere to talk ( {creditBalance ? creditBalance.toString() : '0'} )
+          </span>
         </div>
     </main>
     </>
