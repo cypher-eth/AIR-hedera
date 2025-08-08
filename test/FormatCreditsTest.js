@@ -42,3 +42,4 @@ console.log(formatCredits(BigInt(10) * BigInt(10 ** 18)));
 
 console.log('\nTest 5: 1 wei');
 console.log(formatCredits(BigInt(1)));
+
