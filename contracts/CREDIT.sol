@@ -3,12 +3,17 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title CREDIT
  * @dev ERC20 token contract for CREDIT tokens with built-in burning and tracking functionality
  */
-contract CREDIT is ERC20, Ownable {
+contract CREDIT is ERC20, Ownable, AccessControl {
+    
+    // Role definitions
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     
     // Mapping to track total CREDIT burned by each user
     mapping(address => uint256) public userBurnedCredits;
@@ -16,20 +21,24 @@ contract CREDIT is ERC20, Ownable {
     // Total CREDIT burned across all users
     uint256 public totalBurnedCredits;
     
-    // Operator system
-    mapping(address => bool) public operators;
-    address[] public operatorList;
-    
     // Events
     event CreditsMinted(address indexed to, uint256 amount);
     event CreditsBurned(address indexed user, uint256 amount, uint256 userTotal, uint256 globalTotal);
+    event MinterAdded(address indexed minter);
+    event MinterRemoved(address indexed minter);
     event OperatorAdded(address indexed operator);
     event OperatorRemoved(address indexed operator);
     event OperatorBurn(address indexed operator, address indexed user, uint256 amount, uint256 userTotal, uint256 globalTotal);
     
+    // Modifier to restrict access to minters only
+    modifier onlyMinter() {
+        require(hasRole(MINTER_ROLE, msg.sender), "CREDIT: Caller is not a minter");
+        _;
+    }
+    
     // Modifier to restrict access to operators only
     modifier onlyOperator() {
-        require(operators[msg.sender], "CREDIT: Caller is not an operator");
+        require(hasRole(OPERATOR_ROLE, msg.sender), "CREDIT: Caller is not an operator");
         _;
     }
     
@@ -38,16 +47,18 @@ contract CREDIT is ERC20, Ownable {
      * @param _initialOwner Initial owner of the contract
      */
     constructor(address _initialOwner) ERC20("CREDIT", "CREDIT") Ownable(_initialOwner) {
-        operators[_initialOwner] = true;
-        operatorList.push(_initialOwner);
+        // Grant roles to the initial owner
+        _grantRole(DEFAULT_ADMIN_ROLE, _initialOwner);
+        _grantRole(MINTER_ROLE, _initialOwner);
+        _grantRole(OPERATOR_ROLE, _initialOwner);
     }
     
     /**
-     * @dev Mint CREDIT tokens to a specific address
+     * @dev Mint CREDIT tokens to a specific address (minter only)
      * @param to Address to mint tokens to
      * @param amount Amount of tokens to mint
      */
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(address to, uint256 amount) external onlyMinter {
         _mint(to, amount);
         emit CreditsMinted(to, amount);
     }
@@ -88,16 +99,37 @@ contract CREDIT is ERC20, Ownable {
     }
     
     /**
+     * @dev Add a minter (owner only)
+     * @param minter Address to add as minter
+     */
+    function addMinter(address minter) external onlyOwner {
+        require(minter != address(0), "CREDIT: Cannot add zero address as minter");
+        require(!hasRole(MINTER_ROLE, minter), "CREDIT: Address is already a minter");
+        
+        _grantRole(MINTER_ROLE, minter);
+        emit MinterAdded(minter);
+    }
+    
+    /**
+     * @dev Remove a minter (owner only)
+     * @param minter Address to remove as minter
+     */
+    function removeMinter(address minter) external onlyOwner {
+        require(hasRole(MINTER_ROLE, minter), "CREDIT: Address is not a minter");
+        
+        _revokeRole(MINTER_ROLE, minter);
+        emit MinterRemoved(minter);
+    }
+    
+    /**
      * @dev Add an operator (owner only)
      * @param operator Address to add as operator
      */
     function addOperator(address operator) external onlyOwner {
         require(operator != address(0), "CREDIT: Cannot add zero address as operator");
-        require(!operators[operator], "CREDIT: Address is already an operator");
+        require(!hasRole(OPERATOR_ROLE, operator), "CREDIT: Address is already an operator");
         
-        operators[operator] = true;
-        operatorList.push(operator);
-        
+        _grantRole(OPERATOR_ROLE, operator);
         emit OperatorAdded(operator);
     }
     
@@ -106,19 +138,9 @@ contract CREDIT is ERC20, Ownable {
      * @param operator Address to remove as operator
      */
     function removeOperator(address operator) external onlyOwner {
-        require(operators[operator], "CREDIT: Address is not an operator");
+        require(hasRole(OPERATOR_ROLE, operator), "CREDIT: Address is not an operator");
         
-        operators[operator] = false;
-        
-        // Remove from operatorList
-        for (uint i = 0; i < operatorList.length; i++) {
-            if (operatorList[i] == operator) {
-                operatorList[i] = operatorList[operatorList.length - 1];
-                operatorList.pop();
-                break;
-            }
-        }
-        
+        _revokeRole(OPERATOR_ROLE, operator);
         emit OperatorRemoved(operator);
     }
     
@@ -159,19 +181,12 @@ contract CREDIT is ERC20, Ownable {
     }
     
     /**
-     * @dev Get the list of all operators
-     * @return Array of operator addresses
+     * @dev Check if an address is a minter
+     * @param minter Address to check
+     * @return True if the address is a minter
      */
-    function getOperatorList() external view returns (address[] memory) {
-        return operatorList;
-    }
-    
-    /**
-     * @dev Get the number of operators
-     * @return Number of operators
-     */
-    function getOperatorCount() external view returns (uint256) {
-        return operatorList.length;
+    function isMinter(address minter) external view returns (bool) {
+        return hasRole(MINTER_ROLE, minter);
     }
     
     /**
@@ -180,6 +195,12 @@ contract CREDIT is ERC20, Ownable {
      * @return True if the address is an operator
      */
     function isOperator(address operator) external view returns (bool) {
-        return operators[operator];
+        return hasRole(OPERATOR_ROLE, operator);
     }
+    
+
+    
+
+    
+
 } 
