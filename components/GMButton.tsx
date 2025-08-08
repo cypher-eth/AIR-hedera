@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
 import { GMNFT_ADDRESS } from '@/app/constants/contracts';
 import { usePrivy } from '@privy-io/react-auth';
-import { GMNFT_ABI } from '@/abis';
+import { GMNFT_ABI_ARRAY } from '@/abis';
 
 export function GMButton() {
   const { address, isConnected } = useAccount();
@@ -17,7 +17,7 @@ export function GMButton() {
 
   const { data: canMint, isLoading: isLoadingCanMint, refetch, error: canMintError } = useReadContract({
     address: GMNFT_ADDRESS,
-    abi: GMNFT_ABI,
+    abi: GMNFT_ABI_ARRAY,
     functionName: 'canMint',
     args: [address!],
     query: {
@@ -74,7 +74,7 @@ export function GMButton() {
     try {
       const result = await writeContractAsync({
         address: GMNFT_ADDRESS,
-        abi: GMNFT_ABI,
+        abi: GMNFT_ABI_ARRAY,
         functionName: 'mint',
       });
       showNotificationMessage('Transaction sent! Waiting for confirmation...', 'info');

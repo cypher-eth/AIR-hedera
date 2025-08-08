@@ -13,11 +13,11 @@ contract DeployAll is Script {
         
         vm.startBroadcast(deployerPrivateKey);
         
-        // Step 1: Deploy CREDIT token with deployer as initial owner and minter
+        // Deploy CREDIT token with role-based access control
         CREDIT credit = new CREDIT(deployer);
         console.log("CREDIT token deployed to:", address(credit));
         
-        // Step 2: Deploy GMNFT contract
+        // Deploy GMNFT contract
         GMNft gmnft = new GMNft(
             "GM NFT",           // name
             "GMNFT",            // symbol
@@ -27,26 +27,21 @@ contract DeployAll is Script {
         );
         console.log("GM NFT deployed to:", address(gmnft));
         
-        // Step 3: Deploy WATER contract
-        uint256 initialConversionRate = 100 * 1e18; // 100 CREDIT per ETH
+        // Deploy WATER contract for HBAR to CREDIT swapping
         WATER water = new WATER(
             deployer,           // initial owner
             address(credit),    // CREDIT token address
-            initialConversionRate // 100 CREDIT per 1 ETH
+            100 * 1e18         // 100 CREDIT per 1 HBAR
         );
         console.log("WATER contract deployed to:", address(water));
         
-        // Step 4: Add GMNFT as a minter to CREDIT
-        credit.addMinter(address(gmnft));
+        // Add GMNFT as a minter to CREDIT with higher gas
+        credit.addMinter{gas: 5000000}(address(gmnft));
         console.log("GMNFT added as minter to CREDIT");
         
-        // Step 5: Add WATER as a minter to CREDIT
-        credit.addMinter(address(water));
+        // Add WATER as a minter to CREDIT with higher gas
+        credit.addMinter{gas: 5000000}(address(water));
         console.log("WATER added as minter to CREDIT");
-        
-        // Step 6: Add deployer as an operator to CREDIT (for burn API)
-        credit.addOperator(deployer);
-        console.log("Deployer added as operator to CREDIT");
         
         vm.stopBroadcast();
         
@@ -55,7 +50,12 @@ contract DeployAll is Script {
         console.log("CREDIT token:", address(credit));
         console.log("GMNFT contract:", address(gmnft));
         console.log("WATER contract:", address(water));
-        console.log("Initial conversion rate: 100 CREDIT per 1 ETH");
+        console.log("Initial conversion rate: 100 CREDIT per 1 HBAR");
         console.log("=== Deployment Complete ===");
     }
 }
+
+/*
+Deployment command using configured RPC with higher gas:
+forge script script/DeployAll.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+*/

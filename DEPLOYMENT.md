@@ -1,98 +1,145 @@
-# Deployment Guide
+# Contract Deployment Information
 
-## Overview
+## Deployed Contracts on Hedera Testnet (Chain ID: 296)
 
-This guide explains how to properly deploy the CREDIT and GMNFT contracts with the correct ownership relationship.
+### Contract Addresses
 
-## The Issue
+- **CREDIT Token**: `0x37805D217B7FFd09099d51711C246E2624EB6a9f`
+- **GMNFT Contract**: `0x98db66DdB483BBAc7956702aA1A4BD43c95493f1`
+- **WATER Contract**: `0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336`
 
-The GMNFT contract needs to be the owner of the CREDIT contract to mint tokens. If this relationship is not set up correctly, minting will fail with a transaction revert error.
+### RPC Configuration
 
-## Deployment Options
+- **Primary RPC URL**: `https://testnet.hashio.io/api`
+- **Alternative Fast RPCs**:
+  - `https://testnet.arkhia.io/hedera/json-rpc/v1`
+  - `https://testnet.calaxy.com/hedera/json-rpc/v1`
+  - `https://testnet-rpc.myhbarwallet.com`
+- **Gas Limit**: `60,000,000`
+- **Gas Price**: `1,000,000,000,000` (1000 gwei - high priority)
 
-### Option 1: Deploy Everything Together (Recommended)
+### Role Configuration
 
-Use the comprehensive deployment script that sets up everything correctly:
+- **CREDIT Owner**: `0x2Da15ef1a356B1916D26b573D6Dbe3A619af68a2`
+- **GMNFT**: Minter of CREDIT ✅
+- **WATER**: Minter of CREDIT ✅
+- **Deployer**: Operator of CREDIT ✅
 
+## 🚀 Deployment Strategies for Faster Transactions
+
+### Strategy 1: Use Alternative RPC Endpoints
 ```bash
-npm run deploy:all
+# Try different RPC endpoints for better performance
+forge script script/DeployAll.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
+forge script script/DeployAll.s.sol --rpc-url hedera_testnet_calaxy --broadcast --gas-limit 60000000
+forge script script/DeployAll.s.sol --rpc-url hedera_testnet_myhbarwallet --broadcast --gas-limit 60000000
 ```
 
-This script:
-1. Deploys CREDIT token with deployer as initial owner
-2. Deploys GMNFT contract
-3. Transfers CREDIT ownership to GMNFT contract
-4. Verifies the setup
-
-### Option 2: Deploy Separately
-
-If you need to deploy contracts separately:
-
+### Strategy 2: Sequential Deployment (Recommended)
 ```bash
-# Deploy CREDIT first
-npm run deploy:credit
-
-# Deploy GMNFT (you'll need to set CREDIT_ADDRESS in your .env)
-npm run deploy:gmnft
-
-# Fix ownership relationship
-npm run fix:ownership
+# Deploy contracts one by one with delays
+forge script script/DeploySequential.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
 ```
 
-### Option 3: Fix Existing Deployment
-
-If you already have contracts deployed but they're not working:
-
+### Strategy 3: Individual Deployments
 ```bash
-npm run fix:ownership
+# Deploy contracts individually
+forge script script/DeployCredit.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
+forge script script/DeployGMNFT.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
+forge script script/DeployWATER.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
 ```
 
-This script transfers CREDIT ownership to the GMNFT contract.
-
-## Environment Variables
-
-Make sure you have these environment variables set:
-
+### Strategy 4: Resume Failed Deployments
 ```bash
-PRIVATE_KEY=your_private_key_here
-CREDIT_ADDRESS=0x...  # Only needed for separate deployment
-GMNFT_ADDRESS=0x...   # Only needed for separate deployment
+# Resume from where you left off
+forge script script/DeployAll.s.sol --resume --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
 ```
 
-## Verification
+## 🔧 Troubleshooting Deployment Issues
 
-After deployment, you can verify the setup by checking:
+### If Transactions Get Stuck:
+1. **Try Alternative RPC**: Switch to `hedera_testnet_fast`, `hedera_testnet_calaxy`, or `hedera_testnet_myhbarwallet`
+2. **Use Sequential Deployment**: Deploy contracts one by one with `DeploySequential.s.sol`
+3. **Increase Gas Price**: Already set to 1000 gwei for high priority
+4. **Wait and Resume**: Use `--resume` flag to continue from where you left off
+5. **Check Network Status**: Hedera Testnet can be congested during peak times
 
-1. **CREDIT contract owner** should be the GMNFT contract address
-2. **GMNFT creditToken** should point to the CREDIT contract address
+### Common Error Solutions:
+- **"Insufficient CREDIT balance"**: This is expected during deployment, not an error
+- **"Address is already a minter"**: Some roles were already set in previous deployments
+- **"Transaction stuck"**: Try alternative RPC endpoints or wait and resume
 
-## Troubleshooting
+## 📋 Standard Deployment Commands
 
-### Common Issues
+### Deploy All Contracts
+```bash
+forge script script/DeployAll.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+```
 
-1. **"execution reverted" error**: Usually means CREDIT ownership is not set correctly
-2. **"Daily mint limit reached"**: You've already minted today, wait for cooldown
-3. **"Max supply reached"**: All NFTs have been minted
+### Deploy Individual Contracts
+```bash
+# Deploy CREDIT
+forge script script/DeployCredit.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
 
-### Debugging
+# Deploy GMNFT
+forge script script/DeployGMNFT.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
 
-The frontend includes debugging information. Check the browser console for:
-- CREDIT contract owner
-- GMNFT contract status
-- Mint eligibility status
+# Deploy WATER
+forge script script/DeployWATER.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+```
 
-## Contract Addresses
+### Setup Roles
+```bash
+forge script script/SetupRoles.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+```
 
-Current deployed addresses (Hedera Testnet):
-- **CREDIT**: `0xff1704BE90F5864e20e1Ceaa95FfB1f3d7673875`
-- **GMNFT**: `0x136BA3DbB43B21aabc681E270B3893Eae807c705`
+### Contract Functions
 
-## Testing
+#### CREDIT Token
+- `mint(address to, uint256 amount)` - Mint CREDIT tokens (minter only)
+- `burn(uint256 amount)` - Burn tokens from caller
+- `burnFrom(address from, uint256 amount)` - Burn tokens from specific address (owner only)
+- `burnCredits(uint256 amount)` - Burn CREDIT tokens and track
+- `operatorBurn(address user, uint256 amount)` - Operator burn function
+- `addMinter(address minter)` - Add minter (owner only)
+- `removeMinter(address minter)` - Remove minter (owner only)
+- `addOperator(address operator)` - Add operator (owner only)
+- `removeOperator(address operator)` - Remove operator (owner only)
 
-After deployment, test the setup:
+#### GMNFT Contract
+- `mint()` - Mint NFT and CREDIT tokens
+- `canMint(address user)` - Check if user can mint
 
-1. Try minting a GM NFT
-2. Check if CREDIT tokens are received
-3. Try burning CREDIT tokens with the water feature
+#### WATER Contract
+- `purchaseTokens()` - Swap HBAR for CREDIT tokens
+- `setConversionRate(uint256 newRate)` - Set conversion rate (owner only)
+- `setCreditToken(address newCreditToken)` - Set CREDIT token address (owner only)
+- `claimFunds()` - Claim accumulated HBAR (owner only)
+- `calculateCreditAmount(uint256 ethAmount)` - Calculate CREDIT amount for HBAR
+- `getContractInfo()` - Get contract information
 
-If minting fails, run the fix ownership script and try again. 
+### Environment Variables
+
+Required environment variables:
+- `PRIVATE_KEY` - Deployer private key
+
+### Network Configuration
+
+- **Chain ID**: 296 (Hedera Testnet)
+- **Currency**: HBAR
+- **Block Time**: ~2 seconds
+- **Gas Limit**: 60,000,000
+- **Gas Price**: 660 gwei
+
+### Recent Deployments
+
+- **CREDIT**: Deployed successfully with role-based access control
+- **GMNFT**: Deployed successfully, configured as CREDIT minter
+- **WATER**: Deployed successfully, configured as CREDIT minter
+- **Roles**: All role assignments completed successfully
+
+### API Endpoints
+
+- **Burn API**: `/api/burn` - Burn CREDIT tokens using operatorBurn
+- **Voice API**: `/api/ai/voice` - AI voice processing
+- **Test API**: `/api/test-n8n` - N8N workflow testing 

@@ -22,4 +22,9 @@ contract DeployCredit is Script {
         console.log("Deployer address:", deployer);
         console.log("CREDIT owner address:", owner);
     }
-} 
+}
+
+/*
+Deployment command using configured RPC:
+forge script script/DeployCredit.s.sol --rpc-url hedera_testnet --broadcast
+*/ 

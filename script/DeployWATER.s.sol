@@ -9,18 +9,18 @@ contract DeployWATER is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
-        // Get the CREDIT token address from environment
-        address creditAddress = vm.envAddress("CREDIT_ADDRESS");
+        // Use the deployed CREDIT token address
+        address creditAddress = 0x37805D217B7FFd09099d51711C246E2624EB6a9f;
         
-        // Initial conversion rate: 100 CREDIT per 1 ETH (with 18 decimals)
-        uint256 initialConversionRate = 100 * 1e18; // 100 CREDIT per ETH
+        // Initial conversion rate: 100 CREDIT per 1 HBAR (with 18 decimals)
+        uint256 initialConversionRate = 100 * 1e18; // 100 CREDIT per HBAR
         
         vm.startBroadcast(deployerPrivateKey);
         
         WATER water = new WATER(
             deployer,           // initial owner
             creditAddress,      // CREDIT token address
-            initialConversionRate // 100 CREDIT per 1 ETH
+            initialConversionRate // 100 CREDIT per 1 HBAR
         );
         
         vm.stopBroadcast();
@@ -29,6 +29,15 @@ contract DeployWATER is Script {
         console.log("Deployer address:", deployer);
         console.log("CREDIT token address:", creditAddress);
         console.log("Initial conversion rate:", initialConversionRate);
-        console.log("Rate: 100 CREDIT per 1 ETH");
+        console.log("Rate: 100 CREDIT per 1 HBAR");
     }
 }
+
+/*
+Deployment command using configured RPC:
+forge script script/DeployWATER.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+
+Contract Addresses:
+- CREDIT: 0x37805D217B7FFd09099d51711C246E2624EB6a9f
+- WATER: 0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336
+*/

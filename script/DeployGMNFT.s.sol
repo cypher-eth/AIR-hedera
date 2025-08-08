@@ -28,4 +28,9 @@ contract DeployGMNFT is Script {
         console.log("Deployer address:", deployer);
         console.log("CREDIT token address:", creditAddress);
     }
-} 
+}
+
+/*
+Deployment command using configured RPC:
+forge script script/DeployGMNFT.s.sol --rpc-url hedera_testnet --broadcast
+*/ 

@@ -9,9 +9,9 @@ export const runtime = 'nodejs'; // ensures Node (Edge can't sign with PK)
 export const dynamic = 'force-dynamic';
 
 // Hardcoded values from the repository
-const RPC_URL = 'https://hedera-testnet.rpc.thirdweb.com/';
+const RPC_URL = 'https://testnet.hashio.io/api';
 const OPERATOR_PRIVATE_KEY = process.env.PRIVATE_KEY || '0x1234567890123456789012345678901234567890123456789012345678901234'; // Get from env or fallback to test key
-const CREDIT_ADDRESS = '0xE63684e16B68636133811D61ae218a31D136F5Da' as `0x${string}`;
+const CREDIT_ADDRESS = '0x37805D217B7FFd09099d51711C246E2624EB6a9f' as `0x${string}`;
 const CHAIN_ID = 296; // Hedera Testnet
 
 const CREDIT_ABI = [

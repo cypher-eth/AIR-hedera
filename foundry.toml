@@ -1,15 +1,28 @@
 [profile.default]
 src = "contracts"
 out = "out"
-libs = [
-    "lib",
-    "node_modules",
-]
+libs = ["lib"]
 solc_version = "0.8.24"
 optimizer = true
 optimizer_runs = 200
 
+# Gas configuration - optimized for Hedera Testnet
+gas_limit = 60000000
+gas_price = 1000000000000  # 1000 gwei - much higher priority
+
+# RPC Configuration for Hedera Testnet
 [rpc_endpoints]
 hedera_testnet = "https://testnet.hashio.io/api"
+hedera_testnet_fast = "https://hedera-testnet.rpc.thirdweb.com/"
+hedera_testnet_calaxy = "https://testnet.calaxy.com/hedera/json-rpc/v1"
+hedera_testnet_myhbarwallet = "https://testnet-rpc.myhbarwallet.com"
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Deployment Configuration
+# - Use hedera_testnet alias for RPC
+# - Gas limit: 60,000,000 (doubled for better transaction processing)
+# - Gas price: 660 gwei (optimized for Hedera)
+#
+# Example deployment commands:
+# forge script script/DeployAll.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+# forge script script/DeployAll.s.sol --rpc-url hedera_testnet_fast --broadcast --gas-limit 60000000
+# forge script script/DeployAll.s.sol --rpc-url hedera_testnet_calaxy --broadcast --gas-limit 60000000

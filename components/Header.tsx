@@ -1,21 +1,35 @@
 'use client';
 
 import { usePrivy } from '@privy-io/react-auth';
-import { useAccount } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
 import { LogOut, User, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { CREDIT_ADDRESS } from '@/app/constants/contracts';
+import { CREDIT_ABI_ARRAY } from '@/abis';
 
 interface HeaderProps {
   status: string;
+  onOpenTopUp?: () => void;
 }
 
-export function Header({ status }: HeaderProps) {
+export function Header({ status, onOpenTopUp }: HeaderProps) {
   const { user, logout, authenticated } = usePrivy();
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  // Read CREDIT balance
+  const { data: creditBalance } = useReadContract({
+    address: CREDIT_ADDRESS,
+    abi: CREDIT_ABI_ARRAY,
+    functionName: 'balanceOf',
+    args: [address!],
+    query: {
+      enabled: !!address && isConnected,
+    },
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -47,15 +61,15 @@ export function Header({ status }: HeaderProps) {
             </div>
           </div>
 
-          {/* User Address with Dropdown - Only show when authenticated */}
+          {/* Credits Display with Dropdown - Only show when authenticated */}
           {authenticated && address && (
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 transition-colors"
               >
-                <span className="text-white/90 text-sm font-mono">
-                  {address.slice(0, 4)}..{address.slice(-4)}
+                <span className="text-white/90 text-sm font-medium">
+                  Credits {creditBalance ? creditBalance.toString() : '0'}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-white/70 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -79,21 +93,23 @@ export function Header({ status }: HeaderProps) {
                       </>
                     )}
 
-                    {/* Four new options */}
+                    {/* Navigation options */}
                     <button 
-                      onClick={() => handleNavigation('/')}
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onOpenTopUp?.();
+                      }}
                       className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors"
                     >
-                      Home
-                    </button>
+                      Buy Credits
+                    </button>                    
                     <button 
                       onClick={() => handleNavigation('/send')}
                       className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors"
                     >
-                      Send
+                      Send Tokens
                     </button>
-                    <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">Start a breathwork</button>
-                    <button className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors">My account</button>
+
 
                     {/* Divider */}
                     <div className="border-t border-white/10"></div>

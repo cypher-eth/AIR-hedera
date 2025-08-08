@@ -10,6 +10,7 @@ import { parseAbiItem } from 'viem';
 import { Header } from '@/components/Header';
 import { GMButton } from '@/components/GMButton';
 import { SaveButton } from '@/components/SaveButton';
+import { BuyCreditsModal } from '@/components/BuyCreditsModal';
 import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 
 export type ResponseType = 'info' | 'quiz' | 'correct';
@@ -100,6 +101,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState<string>('Ready');
   const [showModal, setShowModal] = useState(false);
+  const [showWaterModal, setShowWaterModal] = useState(false);
   
   // Audio state management
   const [isAIAudioPlaying, setIsAIAudioPlaying] = useState(false);
@@ -456,7 +458,7 @@ export default function Home() {
   
   return (
     <>
-      <Header status={status} />
+      <Header status={status} onOpenTopUp={() => setShowWaterModal(true)} />
       <main className="min-h-screen flex flex-col items-center justify-center p-4">
 
         {/* AI Avatar Sphere */}
@@ -489,6 +491,13 @@ export default function Home() {
           responseText={currentResponse}
           isSpeaking={isSpeaking}
         />
+        
+        {/* Buy Credits Modal */}
+        <BuyCreditsModal 
+          isOpen={showWaterModal} 
+          onClose={() => setShowWaterModal(false)} 
+        />
+        
         <GMButton />
         <SaveButton />
         {/* Faint instruction text between the two buttons */}
