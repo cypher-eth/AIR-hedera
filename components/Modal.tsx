@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X } from 'lucide-react';
-import { useAccount, useConnect, useDisconnect, useWriteContract } from 'wagmi';
-import { parseEther } from 'viem';
+import { useAccount, useWriteContract } from 'wagmi';
+import { GMNFT_ADDRESS } from '@/app/constants/contracts';
 
 interface ModalProps {
   isOpen: boolean;
@@ -15,38 +15,33 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, subtitle }: ModalProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
-  const [transactionHash, setTransactionHash] = useState<string>('');
   const [transactionStatus, setTransactionStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [transactionHash, setTransactionHash] = useState<string>('');
 
   const { address, isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
   const { writeContract } = useWriteContract();
 
-  useEffect(() => {
+  // Handle modal visibility
+  useState(() => {
     if (isOpen) {
       setIsVisible(true);
     } else {
-      setIsVisible(false);
-      setTransactionStatus('idle');
-      setTransactionHash('');
+      setTimeout(() => setIsVisible(false), 300);
     }
-  }, [isOpen]);
+  });
 
   const handleClose = () => {
     setIsVisible(false);
     setTimeout(() => {
       onClose();
+      setTransactionStatus('idle');
+      setTransactionHash('');
     }, 300);
   };
 
   const handleClaimReward = async () => {
-    if (!isConnected) {
-      // Connect wallet first
-      const connector = connectors[0]; // Use first available connector
-      if (connector) {
-        connect({ connector });
-      }
+    if (!isConnected || !address) {
+      console.error('Wallet not connected');
       return;
     }
 
@@ -56,21 +51,21 @@ export function Modal({ isOpen, onClose, title, subtitle }: ModalProps) {
     try {
       // Example contract interaction
       // Replace with your actual contract address and ABI
-      const contractAddress = '0x1234567890123456789012345678901234567890'; // Replace with your contract
+      const contractAddress = GMNFT_ADDRESS; // Use actual GMNFT address
       
       // Simple contract call example
       await writeContract({
         address: contractAddress as `0x${string}`,
         abi: [
           {
-            name: 'claimReward',
+            name: 'mint',
             type: 'function',
             stateMutability: 'nonpayable',
             inputs: [],
             outputs: [],
           },
         ],
-        functionName: 'claimReward',
+        functionName: 'mint',
         args: [],
       });
 
@@ -189,7 +184,7 @@ export function Modal({ isOpen, onClose, title, subtitle }: ModalProps) {
           {/* Disconnect button for connected wallets */}
           {isConnected && (
             <button
-              onClick={() => disconnect()}
+              onClick={() => {/* Disconnect logic removed as per new_code */}}
               className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
             >
               Disconnect Wallet

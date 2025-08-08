@@ -16,16 +16,30 @@ contract CREDIT is ERC20, Ownable {
     // Total CREDIT burned across all users
     uint256 public totalBurnedCredits;
     
+    // Operator system
+    mapping(address => bool) public operators;
+    address[] public operatorList;
+    
     // Events
     event CreditsMinted(address indexed to, uint256 amount);
     event CreditsBurned(address indexed user, uint256 amount, uint256 userTotal, uint256 globalTotal);
+    event OperatorAdded(address indexed operator);
+    event OperatorRemoved(address indexed operator);
+    event OperatorBurn(address indexed operator, address indexed user, uint256 amount, uint256 userTotal, uint256 globalTotal);
+    
+    // Modifier to restrict access to operators only
+    modifier onlyOperator() {
+        require(operators[msg.sender], "CREDIT: Caller is not an operator");
+        _;
+    }
     
     /**
      * @dev Constructor
      * @param _initialOwner Initial owner of the contract
      */
     constructor(address _initialOwner) ERC20("CREDIT", "CREDIT") Ownable(_initialOwner) {
-        // Initial supply can be minted by owner if needed
+        operators[_initialOwner] = true;
+        operatorList.push(_initialOwner);
     }
     
     /**
@@ -74,6 +88,60 @@ contract CREDIT is ERC20, Ownable {
     }
     
     /**
+     * @dev Add an operator (owner only)
+     * @param operator Address to add as operator
+     */
+    function addOperator(address operator) external onlyOwner {
+        require(operator != address(0), "CREDIT: Cannot add zero address as operator");
+        require(!operators[operator], "CREDIT: Address is already an operator");
+        
+        operators[operator] = true;
+        operatorList.push(operator);
+        
+        emit OperatorAdded(operator);
+    }
+    
+    /**
+     * @dev Remove an operator (owner only)
+     * @param operator Address to remove as operator
+     */
+    function removeOperator(address operator) external onlyOwner {
+        require(operators[operator], "CREDIT: Address is not an operator");
+        
+        operators[operator] = false;
+        
+        // Remove from operatorList
+        for (uint i = 0; i < operatorList.length; i++) {
+            if (operatorList[i] == operator) {
+                operatorList[i] = operatorList[operatorList.length - 1];
+                operatorList.pop();
+                break;
+            }
+        }
+        
+        emit OperatorRemoved(operator);
+    }
+    
+    /**
+     * @dev Operator burn function - allows operators to burn tokens from any user
+     * @param user Address to burn tokens from
+     * @param amount Amount of tokens to burn
+     */
+    function operatorBurn(address user, uint256 amount) external onlyOperator {
+        require(amount > 0, "CREDIT: Amount must be greater than 0");
+        require(balanceOf(user) >= amount, "CREDIT: Insufficient CREDIT balance");
+        
+        // Burn the CREDIT tokens from the specified user
+        _burn(user, amount);
+        
+        // Update tracking
+        userBurnedCredits[user] += amount;
+        totalBurnedCredits += amount;
+        
+        emit OperatorBurn(msg.sender, user, amount, userBurnedCredits[user], totalBurnedCredits);
+    }
+    
+    /**
      * @dev Get the total CREDIT burned by a specific user
      * @param user Address to check
      * @return Total CREDIT burned by the user
@@ -88,5 +156,30 @@ contract CREDIT is ERC20, Ownable {
      */
     function getTotalBurnedCredits() external view returns (uint256) {
         return totalBurnedCredits;
+    }
+    
+    /**
+     * @dev Get the list of all operators
+     * @return Array of operator addresses
+     */
+    function getOperatorList() external view returns (address[] memory) {
+        return operatorList;
+    }
+    
+    /**
+     * @dev Get the number of operators
+     * @return Number of operators
+     */
+    function getOperatorCount() external view returns (uint256) {
+        return operatorList.length;
+    }
+    
+    /**
+     * @dev Check if an address is an operator
+     * @param operator Address to check
+     * @return True if the address is an operator
+     */
+    function isOperator(address operator) external view returns (bool) {
+        return operators[operator];
     }
 } 
