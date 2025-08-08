@@ -49,8 +49,8 @@ contract UserFlowTest is Test {
         console.log("CREDIT balance after first mint:", afterFirstMint);
         console.log("CREDITS earned:", afterFirstMint - initialBalance);
         
-        // Verify user earned CREDITS
-        assertEq(afterFirstMint - initialBalance, CREDIT_PER_MINT, "Should earn 10 CREDITS for first mint");
+            // Verify user earned CREDITS (10 CREDITS = 10 * 10^18 wei)
+    assertEq(afterFirstMint - initialBalance, 10 * 1e18, "Should earn 10 CREDITS for first mint");
         assertEq(gmNft.balanceOf(user), 1, "Should own 1 GM NFT");
         
         // Step 2: User mints again (after cooldown)
@@ -68,8 +68,8 @@ contract UserFlowTest is Test {
         console.log("CREDIT balance after second mint:", afterSecondMint);
         console.log("Total CREDITS earned:", afterSecondMint - initialBalance);
         
-        // Verify second mint
-        assertEq(afterSecondMint - beforeSecondMint, CREDIT_PER_MINT, "Should earn 10 CREDITS for second mint");
+        // Verify second mint (10 CREDITS = 10 * 10^18 wei)
+        assertEq(afterSecondMint - beforeSecondMint, 10 * 1e18, "Should earn 10 CREDITS for second mint");
         assertEq(gmNft.balanceOf(user), 2, "Should own 2 GM NFTs");
         
         // Step 3: Check system balances

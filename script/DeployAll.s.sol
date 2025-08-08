@@ -36,11 +36,11 @@ contract DeployAll is Script {
         console.log("WATER contract deployed to:", address(water));
         
         // Add GMNFT as a minter to CREDIT with higher gas
-        credit.addMinter{gas: 5000000}(address(gmnft));
+        credit.addMinter(address(gmnft));
         console.log("GMNFT added as minter to CREDIT");
         
         // Add WATER as a minter to CREDIT with higher gas
-        credit.addMinter{gas: 5000000}(address(water));
+        credit.addMinter(address(water));
         console.log("WATER added as minter to CREDIT");
         
         vm.stopBroadcast();

@@ -27,8 +27,8 @@ contract GMNft is ERC721, Ownable {
     // CREDIT token contract reference
     CREDIT public creditToken;
     
-    // Amount of CREDIT tokens to mint per NFT mint
-    uint256 public constant CREDIT_PER_MINT = 10;
+    // Amount of CREDIT tokens to mint per NFT mint (10 CREDITS = 10 * 10^18 wei)
+    uint256 public constant CREDIT_PER_MINT = 10 * 1e18;
     
     // Events
     event NFTMinted(address indexed to, uint256 indexed tokenId, uint256 creditsMinted);

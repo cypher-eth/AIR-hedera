@@ -56,10 +56,6 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
     setTimeout(() => setNotificationMessage(''), 5000);
   };
 
-  // Debug logging
-  console.log('Water contract info:', waterContractInfo);
-  console.log('Water contract error:', waterContractError);
-
   const copyToClipboard = async () => {
     if (address) {
       try {
@@ -106,8 +102,33 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
 
   const formatCredits = (credits: bigint) => {
     if (!credits) return '0 CREDITS';
-    return `${credits.toString()} CREDITS`;
+    
+    // CREDIT token uses 18 decimals (standard ERC20)
+    const decimals = 18;
+    const divisor = BigInt(10 ** decimals);
+    
+    const wholePart = credits / divisor;
+    const fractionalPart = credits % divisor;
+    
+    // If there's no fractional part, just show the whole number
+    if (fractionalPart === BigInt(0)) {
+      return `${wholePart.toString()} CREDITS`;
+    }
+    
+    // Format fractional part with proper padding
+    const fractionalString = fractionalPart.toString().padStart(decimals, '0');
+    
+    // Remove trailing zeros
+    const trimmedFractional = fractionalString.replace(/0+$/, '');
+    
+    if (trimmedFractional === '') {
+      return `${wholePart.toString()} CREDITS`;
+    } else {
+      return `${wholePart.toString()}.${trimmedFractional} CREDITS`;
+    }
   };
+
+
 
   const handleMaxClick = () => {
     if (hbarBalance) {
@@ -134,7 +155,11 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
     
     const creditAmount = Math.floor(amountValue * conversionRate);
     
-    return `${creditAmount.toString()} CREDITS`;
+    // Convert to wei format for display (18 decimals)
+    const creditAmountInWei = BigInt(creditAmount) * BigInt(10 ** 18);
+    
+    // Use the same formatting function for consistency
+    return formatCredits(creditAmountInWei);
   };
 
   const handleSwap = async () => {
@@ -200,6 +225,17 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
       setIsValidating(false);
     }
   };
+
+  // Debug logging in useEffect to avoid initialization issues
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Water contract info:', waterContractInfo);
+      console.log('Water contract error:', waterContractError);
+      console.log('CREDIT balance (raw):', creditBalance);
+      console.log('CREDIT balance (formatted):', formatCredits(creditBalance && typeof creditBalance === 'bigint' ? creditBalance : BigInt(0)));
+      console.log('User address:', address);
+    }
+  }, [isOpen, waterContractInfo, waterContractError, creditBalance, address]);
 
   if (!isOpen) return null;
 
