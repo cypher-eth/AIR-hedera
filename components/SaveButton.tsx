@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Droplets } from 'lucide-react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { parseAbiItem } from 'viem';
-import { CREDIT_ADDRESS, WATER_ADDRESS } from '@/app/constants/contracts';
+import { CREDIT_ADDRESS } from '@/app/constants/contracts';
+import { CREDIT_ABI } from '@/abis';
 
 export function SaveButton() {
   const { address, isConnected } = useAccount();
@@ -13,26 +13,15 @@ export function SaveButton() {
   // Read CREDIT balance
   const { data: creditBalance, refetch: refetchCreditBalance } = useReadContract({
     address: CREDIT_ADDRESS,
-    abi: [parseAbiItem('function balanceOf(address owner) view returns (uint256)')],
+    abi: CREDIT_ABI,
     functionName: 'balanceOf',
     args: [address!],
     query: {
-      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
+      enabled: !!address && isConnected,
     },
   });
 
-  // Read WATER contract allowance
-  const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: CREDIT_ADDRESS,
-    abi: [parseAbiItem('function allowance(address owner, address spender) view returns (uint256)')],
-    functionName: 'allowance',
-    args: [address!, WATER_ADDRESS],
-    query: {
-      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
-    },
-  });
-
-  // Write contract for approvals and burns
+  // Write contract for burns
   const { writeContractAsync, isPending } = useWriteContract();
   const { data: receipt, isLoading: isConfirming } = useWaitForTransactionReceipt();
 
@@ -48,7 +37,7 @@ export function SaveButton() {
       return;
     }
 
-    if (!creditBalance || creditBalance === 0n) {
+    if (!creditBalance || creditBalance === BigInt(0)) {
       showNotification('You need CREDIT tokens to use the water feature', 'error');
       return;
     }
@@ -56,28 +45,14 @@ export function SaveButton() {
     setIsProcessing(true);
 
     try {
-      const burnAmount = 1n; // Burn 1 CREDIT token
-      const currentAllowance = allowance || 0n;
+      const burnAmount = BigInt(1); // Burn 1 CREDIT token
 
-      // Check if we need to approve
-      if (currentAllowance < burnAmount) {
-        showNotification('Approving CREDIT tokens for water...', 'info');
-        
-        // Approve WATER contract to spend CREDIT tokens
-        await writeContractAsync({
-          address: CREDIT_ADDRESS,
-          abi: [parseAbiItem('function approve(address spender, uint256 amount) returns (bool)')],
-          functionName: 'approve',
-          args: [WATER_ADDRESS, burnAmount],
-        });
+      showNotification('Burning CREDIT tokens for water...', 'info');
 
-        showNotification('Approval successful! Burning CREDIT tokens...', 'info');
-      }
-
-      // Burn CREDIT tokens
+      // Burn CREDIT tokens directly using the CREDIT contract
       await writeContractAsync({
-        address: WATER_ADDRESS,
-        abi: [parseAbiItem('function burnCredits(uint256 amount)')],
+        address: CREDIT_ADDRESS,
+        abi: CREDIT_ABI,
         functionName: 'burnCredits',
         args: [burnAmount],
       });
@@ -87,7 +62,6 @@ export function SaveButton() {
       // Refetch balances
       setTimeout(() => {
         refetchCreditBalance();
-        refetchAllowance();
       }, 2000);
 
     } catch (error: any) {

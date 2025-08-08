@@ -8,11 +8,11 @@ export const hederaTestnet = /*#__PURE__*/ defineChain({
   nativeCurrency: { name: "USDC", symbol: "USD", decimals: 18 },
   rpcUrls: {
     default: {
-      http: ["https://testnet.hashio.io/api"],
+      http: ["https://hedera-testnet.rpc.thirdweb.com/"],
     },
 
     public: {
-      http: ["https://testnet.hashio.io/api"],
+      http: ["https://hedera-testnet.rpc.thirdweb.com/"],
     },
   },
   blockExplorers: {

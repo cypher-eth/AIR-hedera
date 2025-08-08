@@ -9,13 +9,17 @@ contract DeployCredit is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
+        // Get the intended owner from environment (default to deployer if not set)
+        address owner = vm.envOr("CREDIT_OWNER", deployer);
+        
         vm.startBroadcast(deployerPrivateKey);
         
-        CREDIT credit = new CREDIT(deployer);
+        CREDIT credit = new CREDIT(owner);
         
         vm.stopBroadcast();
         
         console.log("CREDIT token deployed to:", address(credit));
         console.log("Deployer address:", deployer);
+        console.log("CREDIT owner address:", owner);
     }
 } 

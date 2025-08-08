@@ -115,7 +115,7 @@ export default function Home() {
     functionName: 'balanceOf',
     args: [address!],
     query: {
-      enabled: !!address && isConnected && CREDIT_ADDRESS !== '0x0000000000000000000000000000000000000000',
+      enabled: !!address && isConnected,
     },
   });
 

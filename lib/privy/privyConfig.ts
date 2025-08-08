@@ -15,7 +15,5 @@ export const privyConfig: PrivyClientConfig = {
   defaultChain: hederaTestnet296,
   supportedChains: [hederaTestnet296],
   // Add configuration to prevent multiple WalletConnect initializations
-  walletConnectProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-  // Disable automatic wallet connection to prevent conflicts
-  autoConnect: false,
+  walletConnectCloudProjectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
 };

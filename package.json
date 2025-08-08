@@ -9,7 +9,9 @@
     "lint": "next lint",
     "deploy:credit": "forge script script/DeployCredit.s.sol:DeployCredit --rpc-url https://testnet.hashio.io/api --broadcast",
     "deploy:gmnft": "forge script script/DeployGMNFT.s.sol:DeployGMNFT --rpc-url https://testnet.hashio.io/api --broadcast",
-    "deploy:water": "forge script script/DeployWATER.s.sol:DeployWATER --rpc-url https://testnet.hashio.io/api --broadcast",
+    "deploy:all": "forge script script/DeployAll.s.sol:DeployAll --rpc-url https://testnet.hashio.io/api --broadcast",
+    "fix:ownership": "forge script script/FixOwnership.s.sol:FixOwnership --rpc-url https://testnet.hashio.io/api --broadcast",
+
     "build:contracts": "forge build",
     "test:contracts": "forge test"
   },

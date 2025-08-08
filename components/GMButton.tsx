@@ -1,23 +1,15 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi';
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useChainId, useBalance } from 'wagmi';
 import { parseAbiItem } from 'viem';
 import { GMNFT_ADDRESS, CREDIT_ADDRESS } from '@/app/constants/contracts';
 import { usePrivy } from '@privy-io/react-auth';
+import { CREDIT_ABI, GMNFT_ABI } from '@/abis';
 
-// Define the complete ABI for better contract interaction
-const GMNFT_ABI = [
-  parseAbiItem('function canMint(address user) view returns (bool)'),
-  parseAbiItem('function mint()'),
-  parseAbiItem('function getCurrentTokenId() view returns (uint256)'),
-  parseAbiItem('function getLastMintTime(address user) view returns (uint256)'),
-  parseAbiItem('function getTimeUntilNextMint(address user) view returns (uint256)'),
-];
-
-const CREDIT_ABI = [
-  parseAbiItem('function balanceOf(address owner) view returns (uint256)'),
-  parseAbiItem('function mint(address to, uint256 amount)'),
+// Separate ABI for contract detection - use a simple function that exists
+const GMNFT_DETECTION_ABI = [
+  parseAbiItem('function DAILY_COOLDOWN() view returns (uint256)'),
 ];
 
 export function GMButton() {
@@ -37,8 +29,8 @@ export function GMButton() {
   // Check if contract exists by trying to read its code
   const { data: contractCode, error: contractError, isLoading: isContractCodeLoading } = useReadContract({
     address: GMNFT_ADDRESS,
-    abi: GMNFT_ABI,
-    functionName: 'getCurrentTokenId',
+    abi: GMNFT_DETECTION_ABI,
+    functionName: 'DAILY_COOLDOWN',
     query: {
       enabled: !!address && isConnected,
       retry: 1, // Reduce retries to fail faster
@@ -46,11 +38,23 @@ export function GMButton() {
     },
   });
 
+  // Debug: Log contract detection attempts
+  useEffect(() => {
+    if (address && isConnected) {
+      console.log('Contract detection attempt:', {
+        address: GMNFT_ADDRESS,
+        functionName: 'DAILY_COOLDOWN',
+        contractCode,
+        contractError
+      });
+    }
+  }, [address, isConnected, contractCode, contractError]);
+
   // Fallback: Try a simpler contract check
   const { data: fallbackContractCheck, error: fallbackError } = useReadContract({
     address: GMNFT_ADDRESS,
-    abi: [parseAbiItem('function maxSupply() view returns (uint256)')],
-    functionName: 'maxSupply',
+    abi: GMNFT_DETECTION_ABI,
+    functionName: 'DAILY_COOLDOWN',
     query: {
       enabled: !!address && isConnected && contractExists === false,
       retry: 1,
@@ -70,8 +74,21 @@ export function GMButton() {
     },
   });
 
+  // Get time until next mint
+  const { data: timeUntilNextMint } = useReadContract({
+    address: GMNFT_ADDRESS,
+    abi: GMNFT_ABI,
+    functionName: 'getTimeUntilNextMint',
+    args: [address!],
+    query: {
+      enabled: !!address && isConnected && !canMint && canMint !== null,
+      retry: 1,
+      retryDelay: 1000,
+    },
+  });
+
   // Read CREDIT token balance
-  const { data: creditBalance, refetch: refetchCreditBalance } = useReadContract({
+  const { data: creditBalance, refetch: refetchCreditBalance, error: creditBalanceError, isLoading: isCreditBalanceLoading } = useReadContract({
     address: CREDIT_ADDRESS,
     abi: CREDIT_ABI,
     functionName: 'balanceOf',
@@ -80,6 +97,39 @@ export function GMButton() {
       enabled: !!address && isConnected,
       retry: 1,
       retryDelay: 1000,
+    },
+  });
+
+  // Debug: Log CREDIT balance attempts
+  useEffect(() => {
+    if (address && isConnected) {
+      console.log('CREDIT balance attempt:', {
+        address: CREDIT_ADDRESS,
+        userAddress: address,
+        creditBalance,
+        creditBalanceError,
+        isCreditBalanceLoading
+      });
+    }
+  }, [address, isConnected, creditBalance, creditBalanceError, isCreditBalanceLoading]);
+
+  // Read native token (HBAR) balance
+  const { data: nativeBalance, refetch: refetchNativeBalance } = useBalance({
+    address: address,
+    query: {
+      enabled: !!address && isConnected,
+      retry: 1,
+      retryDelay: 1000,
+    },
+  });
+
+  // Check CREDIT contract ownership
+  const { data: creditOwner } = useReadContract({
+    address: CREDIT_ADDRESS,
+    abi: CREDIT_ABI,
+    functionName: 'owner',
+    query: {
+      enabled: !!address && isConnected,
     },
   });
 
@@ -169,6 +219,17 @@ export function GMButton() {
 
     if (!canMint) {
       showNotificationMessage('You already GMed today! Come back tomorrow.', 'info');
+      return;
+    }
+
+    // Additional debugging: Check CREDIT contract ownership
+    console.log('CREDIT contract owner:', creditOwner);
+    
+    if (creditOwner && creditOwner !== GMNFT_ADDRESS) {
+      console.warn('CREDIT contract owner is not GMNFT contract!');
+      console.warn('CREDIT owner:', creditOwner);
+      console.warn('GMNFT address:', GMNFT_ADDRESS);
+      showNotificationMessage('Contract configuration issue detected. Please contact support.', 'error');
       return;
     }
 
@@ -326,11 +387,13 @@ export function GMButton() {
             <div><strong>Contract Exists:</strong> {contractExists === null ? 'Checking...' : contractExists ? 'Yes' : 'No'}</div>
             <div><strong>Contract Loading:</strong> {isContractLoading ? 'Yes' : 'No'}</div>
             <div><strong>Contract Code Loading:</strong> {isContractCodeLoading ? 'Yes' : 'No'}</div>
-            <div><strong>Can Mint:</strong> {canMint === null ? 'Unknown' : canMint ? 'Yes' : 'No'}</div>
+            <div><strong>Can Mint:</strong> {canMint === null ? 'Unknown' : canMint ? 'Yes' : 'No'} {!canMint && canMint !== null && '(60s cooldown)'}</div>
+
             <div><strong>Loading:</strong> {isLoadingCanMint ? 'Yes' : 'No'}</div>
-            <div><strong>Contract Address:</strong> {GMNFT_ADDRESS}</div>
-            <div><strong>CREDIT Balance:</strong> {creditBalance ? `${creditBalance.toString()} CREDIT` : 'Loading...'}</div>
-            <div><strong>CREDIT Address:</strong> {CREDIT_ADDRESS}</div>
+            <div><strong>Contract Address:</strong> {GMNFT_ADDRESS} (WORKING)</div>
+            <div><strong>CREDIT Balance:</strong> {creditBalance ? `${creditBalance.toString()} CREDIT` : isCreditBalanceLoading ? 'Loading...' : creditBalanceError ? `Error: ${creditBalanceError.message}` : 'No balance'}</div>
+            <div><strong>CREDIT Address:</strong> {CREDIT_ADDRESS} (v2)</div>
+            <div><strong>Native Balance:</strong> {nativeBalance ? `${nativeBalance.formatted} ${nativeBalance.symbol}` : 'Loading...'}</div>
             {contractError && (
               <div className="text-red-400"><strong>Contract Error:</strong> {contractError.message}</div>
             )}
@@ -345,6 +408,7 @@ export function GMButton() {
                 setContractExists(null);
                 refetch();
                 refetchCreditBalance();
+                refetchNativeBalance();
               }}
               className="text-blue-400 hover:text-blue-300"
             >

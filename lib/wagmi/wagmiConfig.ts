@@ -7,8 +7,16 @@ export const hederaTestnet296 = defineChain({
   network: 'hedera-testnet',
   nativeCurrency: { name: 'USD', symbol: 'USD', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://testnet.hashio.io/api'] },
-    public: { http: ['https://testnet.hashio.io/api'] },
+    default: { http: [
+      'https://testnet.hashio.io/api',
+      'https://testnet.hedera.com',
+      'https://testnet.hedera.com/api'
+    ] },
+    public: { http: [
+      'https://testnet.hashio.io/api',
+      'https://testnet.hedera.com',
+      'https://testnet.hedera.com/api'
+    ] },
   },
   blockExplorers: {
     default: { name: 'HashScan', url: 'https://hashscan.io/testnet' },

@@ -15,8 +15,8 @@ contract GMNft is ERC721, Ownable {
     // Mapping to track last mint time for each user
     mapping(address => uint256) private _lastMintTime;
     
-    // Daily minting cooldown (24 hours in seconds)
-    uint256 public constant DAILY_COOLDOWN = 60;
+    // Daily minting cooldown (5 minutes in seconds)
+    uint256 public constant DAILY_COOLDOWN = 5 * 60 ;
     
     // Maximum supply of NFTs
     uint256 public maxSupply;
