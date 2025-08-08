@@ -84,8 +84,8 @@ The frontend includes debugging information. Check the browser console for:
 ## Contract Addresses
 
 Current deployed addresses (Hedera Testnet):
-- **CREDIT**: `0x642eB62A4D3a645358078e8C597BAB023756c8da`
-- **GMNFT**: `0xFC0C222b76445ab0e13dCDf4dA2627F9B3917F21`
+- **CREDIT**: `0xff1704BE90F5864e20e1Ceaa95FfB1f3d7673875`
+- **GMNFT**: `0x136BA3DbB43B21aabc681E270B3893Eae807c705`
 
 ## Testing
 
