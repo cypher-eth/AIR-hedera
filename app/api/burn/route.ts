@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, createWalletClient, http, parseUnits, isHex, stringToHex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
+import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 
 // If you're on a well-known chain, import it (e.g. import { mainnet, sepolia } from 'viem/chains')
 // Otherwise just pass chainId in the request or via env.
@@ -11,7 +12,6 @@ export const dynamic = 'force-dynamic';
 // Hardcoded values from the repository
 const RPC_URL = 'https://testnet.hashio.io/api';
 const OPERATOR_PRIVATE_KEY = process.env.PRIVATE_KEY || '0x1234567890123456789012345678901234567890123456789012345678901234'; // Get from env or fallback to test key
-const CREDIT_ADDRESS = '0x37805D217B7FFd09099d51711C246E2624EB6a9f' as `0x${string}`;
 const CHAIN_ID = 296; // Hedera Testnet
 
 const CREDIT_ABI = [
@@ -107,13 +107,33 @@ export async function POST(req: NextRequest) {
     // Wait for 1 confirmation (tweak confirmations as needed)
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
-    const success = receipt.status === 'success';
+    // Handle different status formats (string, numeric, or hex string)
+    let success = false;
+    if (receipt.status === undefined || receipt.status === null) {
+      // If status is undefined/null, assume success if we got a receipt
+      success = true;
+    } else if (typeof receipt.status === 'string') {
+      // Handle hex string status (e.g., "0x1" for success, "0x0" for failure)
+      if (receipt.status.startsWith('0x')) {
+        const statusNum = parseInt(receipt.status, 16);
+        success = statusNum === 1;
+      } else {
+        success = receipt.status === 'success';
+      }
+    } else if (typeof receipt.status === 'number') {
+      success = receipt.status === 1; // 1 = success, 0 = failure
+    } else if (typeof receipt.status === 'bigint') {
+      success = receipt.status === BigInt(1); // BigInt version
+    } else {
+      // If we can't determine status, assume success if we got a receipt
+      success = true;
+    }
 
     return NextResponse.json({
       success,
       txHash: hash,
-      blockNumber: receipt.blockNumber.toString(),
-      gasUsed: receipt.gasUsed?.toString?.(),
+      blockNumber: receipt.blockNumber?.toString() || '0',
+      gasUsed: receipt.gasUsed?.toString() || '0',
       user: user,
       amountWei: amountWei.toString(),
     });

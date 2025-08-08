@@ -6,9 +6,9 @@
 
 | Contract | Address | Description |
 |----------|---------|-------------|
-| CREDIT Token | `0x37805D217B7FFd09099d51711C246E2624EB6a9f` | ERC20 token with role-based access control |
-| GMNFT Contract | `0x98db66DdB483BBAc7956702aA1A4BD43c95493f1` | NFT contract that mints CREDIT tokens |
-| WATER Contract | `0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336` | HBAR to CREDIT token swap contract |
+| CREDIT Token | `0xDdDF82a67A934cE809a754783affE9f35c0D0545` | ERC20 token with role-based access control |
+| GMNFT Contract | `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f` | NFT contract that mints CREDIT tokens |
+| WATER Contract | `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD` | HBAR to CREDIT token swap contract |
 
 ### Network Configuration
 
@@ -23,13 +23,13 @@
 | Address | Role | Status |
 |---------|------|--------|
 | `0x2Da15ef1a356B1916D26b573D6Dbe3A619af68a2` | CREDIT Owner | ✅ |
-| `0x98db66DdB483BBAc7956702aA1A4BD43c95493f1` | CREDIT Minter | ✅ |
-| `0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336` | CREDIT Minter | ✅ |
+| `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f` | CREDIT Minter | ✅ |
+| `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD` | CREDIT Minter | ✅ |
 | `0x2Da15ef1a356B1916D26b573D6Dbe3A619af68a2` | CREDIT Operator | ✅ |
 
 ## Contract Functions
 
-### CREDIT Token (`0x37805D217B7FFd09099d51711C246E2624EB6a9f`)
+### CREDIT Token (`0xDdDF82a67A934cE809a754783affE9f35c0D0545`)
 
 #### Minting Functions
 - `mint(address to, uint256 amount)` - Mint CREDIT tokens (minter only)
@@ -52,7 +52,7 @@
 - `isMinter(address minter)` - Check if address is minter
 - `isOperator(address operator)` - Check if address is operator
 
-### GMNFT Contract (`0x98db66DdB483BBAc7956702aA1A4BD43c95493f1`)
+### GMNFT Contract (`0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f`)
 
 #### Core Functions
 - `mint()` - Mint NFT and CREDIT tokens
@@ -62,9 +62,9 @@
 - **Name**: "GM NFT"
 - **Symbol**: "GMNFT"
 - **Max Supply**: 1000
-- **CREDIT Token**: `0x37805D217B7FFd09099d51711C246E2624EB6a9f`
+- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
 
-### WATER Contract (`0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336`)
+### WATER Contract (`0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD`)
 
 #### Swap Functions
 - `purchaseTokens()` - Swap HBAR for CREDIT tokens
@@ -82,7 +82,7 @@
 
 #### Configuration
 - **Conversion Rate**: 100 CREDIT per 1 HBAR
-- **CREDIT Token**: `0x37805D217B7FFd09099d51711C246E2624EB6a9f`
+- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
 
 ## Deployment Commands
 

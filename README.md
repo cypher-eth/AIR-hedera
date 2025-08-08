@@ -2,13 +2,11 @@
 
 A Next.js application with smart contracts deployed on Hedera Testnet for CREDIT token management, NFT minting, and HBAR to CREDIT token swapping.
 
-## 🚀 Deployed Contracts
+## Deployed Contracts
 
-### Contract Addresses (Hedera Testnet - Chain ID: 296)
-
-- **CREDIT Token**: `0x37805D217B7FFd09099d51711C246E2624EB6a9f`
-- **GMNFT Contract**: `0x98db66DdB483BBAc7956702aA1A4BD43c95493f1`
-- **WATER Contract**: `0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336`
+- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
+- **GMNFT Contract**: `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f`
+- **WATER Contract**: `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD`
 
 ### Network Configuration
 

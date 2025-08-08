@@ -9,9 +9,9 @@ contract AddWaterMinter is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
-        // Contract addresses
-        address creditAddress = 0x37805D217B7FFd09099d51711C246E2624EB6a9f;
-        address waterAddress = 0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336; // Deployed WATER address
+        // Get contract addresses from environment variables
+        address creditAddress = vm.envAddress("CREDIT_ADDRESS");
+        address waterAddress = vm.envAddress("WATER_ADDRESS");
         
         vm.startBroadcast(deployerPrivateKey);
         
@@ -34,7 +34,8 @@ contract AddWaterMinter is Script {
 Deployment command using configured RPC with higher gas:
 forge script script/AddWaterMinter.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
 
-Contract Addresses:
-- CREDIT: 0x37805D217B7FFd09099d51711C246E2624EB6a9f
-- WATER: 0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336
+Environment variables needed:
+- PRIVATE_KEY: Your private key
+- CREDIT_ADDRESS: Address of the deployed CREDIT token
+- WATER_ADDRESS: Address of the deployed WATER contract
 */

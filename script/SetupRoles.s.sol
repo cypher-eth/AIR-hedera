@@ -9,10 +9,10 @@ contract SetupRoles is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         
-        // Contract addresses from successful deployments
-        address creditAddress = 0x37805D217B7FFd09099d51711C246E2624EB6a9f;
-        address gmnftAddress = 0x98db66DdB483BBAc7956702aA1A4BD43c95493f1;
-        address waterAddress = 0x13e26834E78a1Cf31B0C1DCEa485547ED88aA336; // New WATER address
+        // Get contract addresses from environment variables
+        address creditAddress = vm.envAddress("CREDIT_ADDRESS");
+        address gmnftAddress = vm.envAddress("GMNFT_ADDRESS");
+        address waterAddress = vm.envAddress("WATER_ADDRESS");
         
         vm.startBroadcast(deployerPrivateKey);
         
@@ -39,4 +39,10 @@ contract SetupRoles is Script {
 /*
 Deployment command using configured RPC with higher gas:
 forge script script/SetupRoles.s.sol --rpc-url hedera_testnet --broadcast --gas-limit 60000000
+
+Environment variables needed:
+- PRIVATE_KEY: Your private key
+- CREDIT_ADDRESS: Address of the deployed CREDIT token
+- GMNFT_ADDRESS: Address of the deployed GMNFT contract
+- WATER_ADDRESS: Address of the deployed WATER contract
 */

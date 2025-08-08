@@ -21,7 +21,7 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
   const router = useRouter();
 
   // Read CREDIT balance
-  const { data: creditBalance } = useReadContract({
+  const { data: creditBalance, refetch: refetchCreditBalance } = useReadContract({
     address: CREDIT_ADDRESS,
     abi: CREDIT_ABI_ARRAY,
     functionName: 'balanceOf',
@@ -30,6 +30,35 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
       enabled: !!address && isConnected,
     },
   });
+
+  // Format CREDIT balance for display
+  const formatCredits = (credits: bigint) => {
+    if (!credits) return '0 CREDITS';
+    
+    // CREDIT token uses 18 decimals (standard ERC20)
+    const decimals = 18;
+    const divisor = BigInt(10 ** decimals);
+    
+    const wholePart = credits / divisor;
+    const fractionalPart = credits % divisor;
+    
+    // If there's no fractional part, just show the whole number
+    if (fractionalPart === BigInt(0)) {
+      return `${wholePart.toString()} CREDITS`;
+    }
+    
+    // Format fractional part with proper padding
+    const fractionalString = fractionalPart.toString().padStart(decimals, '0');
+    
+    // Remove trailing zeros
+    const trimmedFractional = fractionalString.replace(/0+$/, '');
+    
+    if (trimmedFractional === '') {
+      return `${wholePart.toString()} CREDITS`;
+    } else {
+      return `${wholePart.toString()}.${trimmedFractional} CREDITS`;
+    }
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -42,6 +71,17 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Refetch CREDIT balance periodically
+  useEffect(() => {
+    if (!address || !isConnected) return;
+    
+    const interval = setInterval(() => {
+      refetchCreditBalance();
+    }, 5000); // Refetch every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, [address, isConnected, refetchCreditBalance]);
 
   const handleNavigation = (path: string) => {
     setIsDropdownOpen(false);
@@ -69,7 +109,7 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
                 className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 transition-colors"
               >
                 <span className="text-white/90 text-sm font-medium">
-                  Credits {creditBalance ? creditBalance.toString() : '0'}
+                  {formatCredits(creditBalance && typeof creditBalance === 'bigint' ? creditBalance : BigInt(0))}
                 </span>
                 <ChevronDown className={`w-4 h-4 text-white/70 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
