@@ -503,7 +503,7 @@ export default function Home() {
         {/* Faint instruction text between the two buttons */}
         <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20 select-none pointer-events-none">
           <span className="text-[#6d28d9]/50 font-bold tracking-wide text-lg">
-            hold sphere to talk ( {creditBalance ? creditBalance.toString() : '0'} )
+            hold sphere to talk 
           </span>
         </div>
     </main>

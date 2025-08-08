@@ -4,55 +4,58 @@
 
 ### Contract Addresses
 
+This document contains the addresses of all deployed contracts on the Hedera Testnet.
+
+## Deployed Contracts
+
 | Contract | Address | Description |
 |----------|---------|-------------|
-| CREDIT Token | `0xDdDF82a67A934cE809a754783affE9f35c0D0545` | ERC20 token with role-based access control |
-| GMNFT Contract | `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f` | NFT contract that mints CREDIT tokens |
-| WATER Contract | `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD` | HBAR to CREDIT token swap contract |
+| CREDIT Token | `0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021` | ERC20 token with role-based access control |
+| GMNFT Contract | `0x086eB9C3152fBb5E338F872B9207F7173252a88F` | NFT contract that mints CREDIT tokens |
+| WATER Contract | `0xDd38ffa0738E778b31fE3874791Ea090E832300c` | HBAR to CREDIT token swap contract |
 
-### Network Configuration
+## Network Configuration
 
 - **Network**: Hedera Testnet
 - **Chain ID**: 296
-- **RPC URL**: `https://testnet.hashio.io/api`
-- **Gas Limit**: 60,000,000
-- **Gas Price**: 660 gwei
+- **RPC URL**: https://testnet.hashio.io/api
+- **Block Explorer**: https://hashscan.io/testnet
 
-### Role Configuration
+## Role Configuration
+
+The following addresses have been granted specific roles on the CREDIT token:
 
 | Address | Role | Status |
 |---------|------|--------|
 | `0x2Da15ef1a356B1916D26b573D6Dbe3A619af68a2` | CREDIT Owner | ✅ |
-| `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f` | CREDIT Minter | ✅ |
-| `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD` | CREDIT Minter | ✅ |
+| `0x086eB9C3152fBb5E338F872B9207F7173252a88F` | CREDIT Minter | ✅ |
+| `0xDd38ffa0738E778b31fE3874791Ea090E832300c` | CREDIT Minter | ✅ |
 | `0x2Da15ef1a356B1916D26b573D6Dbe3A619af68a2` | CREDIT Operator | ✅ |
 
 ## Contract Functions
 
-### CREDIT Token (`0xDdDF82a67A934cE809a754783affE9f35c0D0545`)
+### CREDIT Token (`0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021`)
 
 #### Minting Functions
 - `mint(address to, uint256 amount)` - Mint CREDIT tokens (minter only)
-- `addMinter(address minter)` - Add minter (owner only)
-- `removeMinter(address minter)` - Remove minter (owner only)
+- `operatorBurn(address from, uint256 amount)` - Burn CREDIT tokens (operator only)
 
-#### Burning Functions
-- `burn(uint256 amount)` - Burn tokens from caller
-- `burnFrom(address from, uint256 amount)` - Burn tokens from specific address (owner only)
-- `burnCredits(uint256 amount)` - Burn CREDIT tokens and track
-- `operatorBurn(address user, uint256 amount)` - Operator burn function
+#### Query Functions
+- `balanceOf(address account)` - Get CREDIT balance for an account
+- `totalSupply()` - Get total CREDIT supply
+- `decimals()` - Get token decimals (18)
+- `name()` - Get token name ("CREDIT")
+- `symbol()` - Get token symbol ("CREDIT")
 
-#### Operator Functions
-- `addOperator(address operator)` - Add operator (owner only)
-- `removeOperator(address operator)` - Remove operator (owner only)
-
-#### View Functions
-- `getUserBurnedCredits(address user)` - Get total CREDIT burned by user
-- `getTotalBurnedCredits()` - Get total CREDIT burned globally
+#### Role Management
+- `addMinter(address minter)` - Add minter role (owner only)
+- `removeMinter(address minter)` - Remove minter role (owner only)
+- `addOperator(address operator)` - Add operator role (owner only)
+- `removeOperator(address operator)` - Remove operator role (owner only)
 - `isMinter(address minter)` - Check if address is minter
 - `isOperator(address operator)` - Check if address is operator
 
-### GMNFT Contract (`0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f`)
+### GMNFT Contract (`0x086eB9C3152fBb5E338F872B9207F7173252a88F`)
 
 #### Core Functions
 - `mint()` - Mint NFT and CREDIT tokens
@@ -62,27 +65,22 @@
 - **Name**: "GM NFT"
 - **Symbol**: "GMNFT"
 - **Max Supply**: 1000
-- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
+- **CREDIT Token**: `0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021`
 
-### WATER Contract (`0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD`)
+### WATER Contract (`0xDd38ffa0738E778b31fE3874791Ea090E832300c`)
 
 #### Swap Functions
 - `purchaseTokens()` - Swap HBAR for CREDIT tokens
-- `calculateCreditAmount(uint256 ethAmount)` - Calculate CREDIT amount for HBAR
+- `calculateCreditAmount(uint256 ethAmount)` - Calculate CREDIT amount for given HBAR
 
-#### Admin Functions
-- `setConversionRate(uint256 newRate)` - Set conversion rate (owner only)
-- `setCreditToken(address newCreditToken)` - Set CREDIT token address (owner only)
-- `claimFunds()` - Claim accumulated HBAR (owner only)
-
-#### View Functions
+#### Management Functions
+- `setConversionRate(uint256 newRate)` - Update conversion rate (owner only)
+- `claimFunds()` - Claim HBAR from contract (owner only)
 - `getContractInfo()` - Get contract information
-- `conversionRate()` - Get current conversion rate
-- `creditToken()` - Get CREDIT token address
 
 #### Configuration
 - **Conversion Rate**: 100 CREDIT per 1 HBAR
-- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
+- **CREDIT Token**: `0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021`
 
 ## Deployment Commands
 

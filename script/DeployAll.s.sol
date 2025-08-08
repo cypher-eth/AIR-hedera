@@ -31,7 +31,7 @@ contract DeployAll is Script {
         WATER water = new WATER(
             deployer,           // initial owner
             address(credit),    // CREDIT token address
-            100 * 1e18         // 100 CREDIT per 1 HBAR
+            1000000000000 * 1e18         // 100 CREDIT per 1 HBAR
         );
         console.log("WATER contract deployed to:", address(water));
         

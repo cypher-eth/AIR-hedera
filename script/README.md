@@ -67,9 +67,9 @@ All scripts require the following environment variables to be set:
 export PRIVATE_KEY="your_private_key_here"
 
 # Optional (for scripts that reference existing contracts)
-export CREDIT_ADDRESS="0xDdDF82a67A934cE809a754783affE9f35c0D0545"
-export GMNFT_ADDRESS="0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f"
-export WATER_ADDRESS="0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD"
+export CREDIT_ADDRESS="0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021"
+export GMNFT_ADDRESS="0x086eB9C3152fBb5E338F872B9207F7173252a88F"
+export WATER_ADDRESS="0xDd38ffa0738E778b31fE3874791Ea090E832300c"
 ```
 
 ### Deploy All Contracts

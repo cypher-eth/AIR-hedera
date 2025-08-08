@@ -20,6 +20,35 @@ export function SaveButton() {
     },
   });
 
+  // Format CREDIT balance for display
+  const formatCredits = (credits: bigint) => {
+    if (!credits) return '0 CREDITS';
+    
+    // CREDIT token uses 18 decimals (standard ERC20)
+    const decimals = 18;
+    const divisor = BigInt(10 ** decimals);
+    
+    const wholePart = credits / divisor;
+    const fractionalPart = credits % divisor;
+    
+    // If there's no fractional part, just show the whole number
+    if (fractionalPart === BigInt(0)) {
+      return `${wholePart.toString()} CREDITS`;
+    }
+    
+    // Format fractional part with proper padding
+    const fractionalString = fractionalPart.toString().padStart(decimals, '0');
+    
+    // Remove trailing zeros
+    const trimmedFractional = fractionalString.replace(/0+$/, '');
+    
+    if (trimmedFractional === '') {
+      return `${wholePart.toString()} CREDITS`;
+    } else {
+      return `${wholePart.toString()}.${trimmedFractional} CREDITS`;
+    }
+  };
+
   const handleWaterClick = () => {
     if (!isConnected || !address) {
       alert('Please connect your wallet first');
@@ -43,7 +72,7 @@ export function SaveButton() {
         <button
           onClick={handleWaterClick}
           className="focus:outline-none cursor-pointer flex items-center justify-center transition-all duration-200 hover:scale-105 rounded-full p-3 border border-white/20 bg-white/10 hover:bg-white/20"
-          title={`Buy CREDITS ${creditBalance ? `(${creditBalance.toString()} CREDITS available)` : ''}`}
+          title={`Buy CREDITS ${creditBalance ? `(${formatCredits(creditBalance as bigint)} available)` : ''}`}
         >
           <Droplets className="w-8 h-8 text-blue-400" />
         </button>

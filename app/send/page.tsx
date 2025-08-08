@@ -87,6 +87,35 @@ export default function SendPage() {
     return `${parseFloat(balance.formatted).toFixed(2)} ${balance.symbol}`;
   };
 
+  // Format CREDIT balance for display
+  const formatCredits = (credits: bigint) => {
+    if (!credits) return '0 CREDITS';
+    
+    // CREDIT token uses 18 decimals (standard ERC20)
+    const decimals = 18;
+    const divisor = BigInt(10 ** decimals);
+    
+    const wholePart = credits / divisor;
+    const fractionalPart = credits % divisor;
+    
+    // If there's no fractional part, just show the whole number
+    if (fractionalPart === BigInt(0)) {
+      return `${wholePart.toString()} CREDITS`;
+    }
+    
+    // Format fractional part with proper padding
+    const fractionalString = fractionalPart.toString().padStart(decimals, '0');
+    
+    // Remove trailing zeros
+    const trimmedFractional = fractionalString.replace(/0+$/, '');
+    
+    if (trimmedFractional === '') {
+      return `${wholePart.toString()} CREDITS`;
+    } else {
+      return `${wholePart.toString()}.${trimmedFractional} CREDITS`;
+    }
+  };
+
   const handleClose = () => {
     router.push('/');
   };
@@ -288,7 +317,7 @@ export default function SendPage() {
               <div className="flex justify-between">
                 <span className="text-white/70">CREDITS:</span>
                 <span className="text-blue-400 font-semibold">
-                  {creditBalance ? `${creditBalance.toString()} CREDITS` : 'Loading...'}
+                  {creditBalance ? formatCredits(creditBalance as bigint) : 'Loading...'}
                 </span>
               </div>
             </div>

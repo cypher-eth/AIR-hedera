@@ -1,12 +1,12 @@
-# AIR Hedera Project
+# AIR-hedera
 
-A Next.js application with smart contracts deployed on Hedera Testnet for CREDIT token management, NFT minting, and HBAR to CREDIT token swapping.
+A decentralized application built on Hedera Hashgraph for AI-powered voice interactions and token management.
 
 ## Deployed Contracts
 
-- **CREDIT Token**: `0xDdDF82a67A934cE809a754783affE9f35c0D0545`
-- **GMNFT Contract**: `0xF7FDCCDBB32DbEcCBaBC5f346AB67Ce1C892012f`
-- **WATER Contract**: `0xa21FCeF30b868D5825B2506253eF2afc9AC80FCD`
+- **CREDIT Token**: `0x9f9DF6958fDcC7F772799AB0D2b3CF01EE47C021`
+- **GMNFT Contract**: `0x086eB9C3152fBb5E338F872B9207F7173252a88F`
+- **WATER Contract**: `0xDd38ffa0738E778b31fE3874791Ea090E832300c`
 
 ### Network Configuration
 

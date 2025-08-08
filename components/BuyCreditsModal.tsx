@@ -143,8 +143,7 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
     const amountValue = parseFloat(amount);
     if (isNaN(amountValue) || amountValue <= 0) return '0 CREDITS';
     
-    // Simple calculation: 1 HBAR = 100 CREDITS
-    // If we have contract info, use that rate, otherwise use 100
+    // Get conversion rate from contract or use default
     let conversionRate = 100; // Default rate
     
     if (waterContractInfo && Array.isArray(waterContractInfo) && waterContractInfo[1]) {
@@ -153,10 +152,12 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
       conversionRate = contractRate > 10**10 ? contractRate / 10**18 : contractRate;
     }
     
-    const creditAmount = Math.floor(amountValue * conversionRate);
+    // Convert to wei first to avoid precision loss
+    const amountInWei = BigInt(Math.floor(amountValue * 10 ** 18));
+    const conversionRateInWei = BigInt(conversionRate * 10 ** 18);
     
-    // Convert to wei format for display (18 decimals)
-    const creditAmountInWei = BigInt(creditAmount) * BigInt(10 ** 18);
+    // Calculate using BigInt arithmetic (same as contract)
+    const creditAmountInWei = (amountInWei * conversionRateInWei) / BigInt(10 ** 18);
     
     // Use the same formatting function for consistency
     return formatCredits(creditAmountInWei);
