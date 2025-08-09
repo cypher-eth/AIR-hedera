@@ -134,6 +134,15 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
                     >
                       Send Tokens
                     </button>
+                    <a 
+                      href="https://portal.hedera.com/faucet"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsDropdownOpen(false)}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-white/10 text-white/90 text-sm font-medium transition-colors block"
+                    >
+                      Faucet
+                    </a>
 
 
                     {/* Divider */}
