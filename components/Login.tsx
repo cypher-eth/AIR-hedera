@@ -12,7 +12,7 @@ export function Login() {
           <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto">
             <span className="text-white font-bold text-2xl">AI</span>
           </div>
-          <h1 className="text-3xl font-bold text-white">Cannes AirAgent</h1>
+          <h1 className="text-3xl font-bold text-white">Hedera AirAgent</h1>
           <p className="text-white/70 text-lg">
             Interactive AI support with voice interface and Web3 integration
           </p>

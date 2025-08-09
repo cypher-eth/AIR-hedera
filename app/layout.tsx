@@ -6,7 +6,7 @@ import { AppProviders } from '@/components/providers/AppProviders';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Cannes AirAgent',
+  title: 'Hedera AirAgent',
   description: 'Interactive AI support with voice interface and Web3 integration',
 };
 
