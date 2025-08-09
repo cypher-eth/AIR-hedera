@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { transcript, audioBlob } = await request.json();
+    const { transcript, audioBlob, userAddress } = await request.json();
 
     // Validate input - require either transcript or audioBlob
     if ((!transcript || typeof transcript !== 'string') && !audioBlob) {
@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       sessionId: request.headers.get('x-session-id') || 'default',
       userAgent: request.headers.get('user-agent'),
       audioData: audioBlob || null, // Include audio data if provided (base64 encoded)
+      userAddress: userAddress || null, // Include user's wallet address if provided
     };
 
     console.log('Sending to n8n workflow:', {

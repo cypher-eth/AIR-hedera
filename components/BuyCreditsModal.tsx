@@ -152,15 +152,21 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
       conversionRate = contractRate > 10**10 ? contractRate / 10**18 : contractRate;
     }
     
-    // Convert to wei first to avoid precision loss
-    const amountInWei = BigInt(Math.floor(amountValue * 10 ** 18));
-    const conversionRateInWei = BigInt(conversionRate * 10 ** 18);
+    // Calculate CREDITS using the conversion rate
+    const creditAmount = amountValue * conversionRate;
     
-    // Calculate using BigInt arithmetic (same as contract)
-    const creditAmountInWei = (amountInWei * conversionRateInWei) / BigInt(10 ** 18);
+    // Divide by 10^10 as requested and round to 6 decimals
+    const adjustedCredits = creditAmount / Math.pow(10, 10);
+    const roundedCredits = Math.round(adjustedCredits * 1000000) / 1000000;
     
-    // Use the same formatting function for consistency
-    return formatCredits(creditAmountInWei);
+    // Format the output
+    if (roundedCredits === Math.floor(roundedCredits)) {
+      // If it's a whole number, show without decimals
+      return `${Math.floor(roundedCredits)} CREDITS`;
+    } else {
+      // If it has decimals, show with up to 6 decimal places
+      return `${roundedCredits.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} CREDITS`;
+    }
   };
 
   const handleSwap = async () => {
@@ -331,14 +337,7 @@ export function BuyCreditsModal({ isOpen, onClose }: BuyCreditsModalProps) {
                   </span>
                 </div>
                 <div className="text-white/50 text-xs mt-1">
-                  Rate: 1 HBAR = {(() => {
-                    if (waterContractInfo && Array.isArray(waterContractInfo) && waterContractInfo[1]) {
-                      const contractRate = Number(waterContractInfo[1] as bigint);
-                      const rate = contractRate > 10**10 ? contractRate / 10**18 : contractRate;
-                      return rate.toFixed(0);
-                    }
-                    return '100';
-                  })()} CREDITS
+                  Rate: 1 HBAR = 100 CREDITS
                 </div>
               </div>
               

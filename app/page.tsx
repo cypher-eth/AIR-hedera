@@ -182,7 +182,8 @@ export default function Home() {
         },
         body: JSON.stringify({ 
           transcript,
-          audioBlob: audioBlobBase64 
+          audioBlob: audioBlobBase64,
+          userAddress: address || null // Include user's wallet address
         }),
       });
 
@@ -294,7 +295,7 @@ export default function Home() {
     } finally {
       processingRef.current = false;
     }
-  }, [stopCurrentAudio]);
+  }, [stopCurrentAudio, address]);
 
   // Handle voice input from Sphere component
   const handleVoiceInput = useCallback(async (transcript: string, audioBlob?: Blob) => {
@@ -361,7 +362,8 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          testData: 'Hello, this is a test message from the web app'
+          testData: 'Hello, this is a test message from the web app',
+          userAddress: address || null // Include user's wallet address
         }),
       });
 
@@ -383,7 +385,7 @@ export default function Home() {
       setAppState('idle');
       setStatus('Ready');
     }
-  }, []);
+  }, [address]);
 
   // Toggle AI audio playback
   const toggleAudio = useCallback(() => {

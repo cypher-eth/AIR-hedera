@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { testData } = await request.json();
+    const { testData, userAddress } = await request.json();
 
     // Get n8n workflow URL from environment variables
     const n8nWorkflowUrl = process.env.N8N_WORKFLOW_URL;
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       sessionId: 'test-session',
       userAgent: 'Test-Client/1.0',
       audioData: null,
+      userAddress: userAddress || null, // Include user's wallet address if provided
     };
 
     console.log('Testing n8n workflow with payload:', testPayload);

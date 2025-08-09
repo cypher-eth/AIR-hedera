@@ -31,7 +31,7 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
     },
   });
 
-  // Format CREDIT balance for display
+  // Format CREDIT balance for display (header only - no decimals)
   const formatCredits = (credits: bigint) => {
     if (!credits) return '0 CREDITS';
     
@@ -39,25 +39,10 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
     const decimals = 18;
     const divisor = BigInt(10 ** decimals);
     
+    // Only show the whole number part (no decimals)
     const wholePart = credits / divisor;
-    const fractionalPart = credits % divisor;
     
-    // If there's no fractional part, just show the whole number
-    if (fractionalPart === BigInt(0)) {
-      return `${wholePart.toString()} CREDITS`;
-    }
-    
-    // Format fractional part with proper padding
-    const fractionalString = fractionalPart.toString().padStart(decimals, '0');
-    
-    // Remove trailing zeros
-    const trimmedFractional = fractionalString.replace(/0+$/, '');
-    
-    if (trimmedFractional === '') {
-      return `${wholePart.toString()} CREDITS`;
-    } else {
-      return `${wholePart.toString()}.${trimmedFractional} CREDITS`;
-    }
+    return `${wholePart.toString()} CREDITS`;
   };
 
   // Close dropdown when clicking outside
