@@ -183,7 +183,7 @@ export default function Home() {
             const frequencyData = conversation.getOutputByteFrequencyData();
             if (frequencyData && frequencyData.length > 0) {
               // Calculate volume using arithmetic mean as specified
-              const sum = Array.from(frequencyData).reduce((acc, byte) => acc + byte, 0);
+              const sum = Array.from(frequencyData as Uint8Array).reduce((acc: number, byte: number) => acc + byte, 0);
               const volume = sum / frequencyData.length;
               // Normalize from 0-255 range to 0-1 range
               const normalizedVolume = volume / 255;
