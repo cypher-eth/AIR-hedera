@@ -1,31 +1,39 @@
 'use client';
 
 import { useConversation } from '@elevenlabs/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { ConversationOrb } from './ConversationOrb';
 
+type ConversationState = 'loading' | 'ready' | 'starting' | 'listening' | 'speaking' | 'stopping' | 'error';
+
 interface ConvAIProps {
+  conversationState: ConversationState;
+  isSpeaking: boolean;
   onMessage?: (message: string) => void;
   onSpeakingChange?: (isSpeaking: boolean) => void;
-  onStatusChange?: (status: string) => void;
+  onConversationStateChange?: (state: ConversationState) => void;
   disabled?: boolean;
 }
 
-export function ConvAI({ onMessage, onSpeakingChange, onStatusChange, disabled = false }: ConvAIProps) {
+export function ConvAI({ 
+  conversationState, 
+  isSpeaking, 
+  onMessage, 
+  onSpeakingChange, 
+  onConversationStateChange, 
+  disabled = false 
+}: ConvAIProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isActive, setIsActive] = useState(false);
+  const operationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const conversation = useConversation({
     onConnect: () => {
       console.log('Connected to ElevenLabs agent');
-      setIsActive(true);
-      onStatusChange?.('Listening...');
+      onConversationStateChange?.('listening');
     },
     onDisconnect: () => {
       console.log('Disconnected from ElevenLabs agent');
-      setIsActive(false);
-      onStatusChange?.('Ready');
+      onConversationStateChange?.('ready');
     },
     onMessage: (message) => {
       console.log('Message received:', message);
@@ -35,23 +43,63 @@ export function ConvAI({ onMessage, onSpeakingChange, onStatusChange, disabled =
     },
     onError: (error) => {
       console.error('ElevenLabs conversation error:', error);
-      setIsActive(false);
-      onStatusChange?.('Ready');
+      onConversationStateChange?.('error');
     },
   });
 
-  // Update speaking state and status
+  // Debug logging for state and status
+  console.log('ConvAI Debug:', {
+    conversationState,
+    conversationStatus: conversation.status,
+    isSpeaking: conversation.isSpeaking,
+    showCancelText: conversationState === 'listening' || conversationState === 'speaking' || conversationState === 'starting' || conversationState === 'stopping'
+  });
+
+  // Clear any pending timeouts
+  const clearOperationTimeout = useCallback(() => {
+    if (operationTimeoutRef.current) {
+      clearTimeout(operationTimeoutRef.current);
+      operationTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Force reset function - bulletproof state reset
+  const forceReset = useCallback(() => {
+    console.log('Force resetting conversation state');
+    clearOperationTimeout();
+    onConversationStateChange?.('ready');
+  }, [clearOperationTimeout, onConversationStateChange]);
+
+  // Determine UI state based solely on ConversationState
+  const isReady = conversationState === 'ready';
+  const isActive = conversationState === 'listening' || conversationState === 'speaking';
+  const isStarting = conversationState === 'starting';
+  const isStopping = conversationState === 'stopping';
+  const canStart = isReady && signedUrl && !disabled;
+  const canStop = isActive || isStarting || isStopping;
+  const showCancelText = canStop;
+
+  // Update speaking state and status based on conversation events
   useEffect(() => {
     onSpeakingChange?.(conversation.isSpeaking);
     
-    if (isActive) {
-      if (conversation.isSpeaking) {
-        onStatusChange?.('Speaking...');
-      } else {
-        onStatusChange?.('Listening...');
+    console.log('Speaking state change:', { 
+      conversationState, 
+      isSpeaking: conversation.isSpeaking,
+      conversationStatus: conversation.status 
+    });
+    
+    // Handle state transitions based on conversation status and speaking state
+    if (conversation.status === 'connected') {
+      if (conversation.isSpeaking && conversationState !== 'speaking') {
+        console.log('Transitioning to speaking state');
+        onConversationStateChange?.('speaking');
+      } else if (!conversation.isSpeaking && conversationState !== 'listening') {
+        console.log('Transitioning to listening state');
+        onConversationStateChange?.('listening');
       }
     }
-  }, [conversation.isSpeaking, isActive, onSpeakingChange, onStatusChange]);
+  }, [conversation.isSpeaking, conversation.status, conversationState, onSpeakingChange, onConversationStateChange]);
 
   // Fetch signed URL on component mount
   useEffect(() => {
@@ -63,21 +111,53 @@ export function ConvAI({ onMessage, onSpeakingChange, onStatusChange, disabled =
         }
         const data = await response.json();
         setSignedUrl(data.signedUrl);
+        onConversationStateChange?.('ready');
       } catch (error) {
         console.error('Failed to fetch signed URL:', error);
-        onStatusChange?.('Ready');
-      } finally {
-        setIsLoading(false);
+        onConversationStateChange?.('error');
       }
     };
 
     fetchSignedUrl();
-  }, [onStatusChange]);
+  }, [onConversationStateChange]);
+
+  // Auto-reset if stuck in starting/stopping state
+  useEffect(() => {
+    if (conversationState === 'starting' || conversationState === 'stopping') {
+      operationTimeoutRef.current = setTimeout(() => {
+        console.log('Operation timeout - forcing reset');
+        forceReset();
+      }, 10000); // 10 second timeout
+    }
+
+    return () => clearOperationTimeout();
+  }, [conversationState, forceReset, clearOperationTimeout]);
 
   const startConversation = useCallback(async () => {
-    if (!signedUrl || isActive) return;
+    console.log('startConversation called - state:', conversationState, 'conversation.status:', conversation.status);
+    
+    // If conversation is already connected, don't start again
+    if (conversation.status === 'connected') {
+      console.log('Conversation already connected, not starting');
+      return;
+    }
+    
+    if (!signedUrl) {
+      console.log('Cannot start: no signed URL');
+      return;
+    }
+
+    // Force reset to ready state if we're in a bad state
+    if (conversationState !== 'ready' && conversationState !== 'error') {
+      console.log('Forcing reset before start, current state:', conversationState);
+      forceReset();
+      return;
+    }
 
     try {
+      console.log('Starting conversation...');
+      onConversationStateChange?.('starting');
+      
       await navigator.mediaDevices.getUserMedia({ audio: true });
       await conversation.startSession({
         signedUrl,
@@ -85,23 +165,37 @@ export function ConvAI({ onMessage, onSpeakingChange, onStatusChange, disabled =
       });
     } catch (error) {
       console.error('Failed to start conversation:', error);
-      onStatusChange?.('Ready');
+      forceReset();
     }
-  }, [conversation, signedUrl, isActive, onStatusChange]);
+  }, [conversation, signedUrl, conversationState, onConversationStateChange, forceReset]);
 
   const stopConversation = useCallback(async () => {
-    if (!isActive) return;
+    console.log('stopConversation called - state:', conversationState);
+    
+    if (!canStop) {
+      console.log('Cannot stop: not in stoppable state, current state:', conversationState);
+      return;
+    }
 
     try {
+      console.log('Stopping conversation...');
+      onConversationStateChange?.('stopping');
+      
       await conversation.endSession();
     } catch (error) {
       console.error('Failed to stop conversation:', error);
-      setIsActive(false);
-      onStatusChange?.('Ready');
+      forceReset();
     }
-  }, [conversation, isActive, onStatusChange]);
+  }, [conversationState, canStop, onConversationStateChange, forceReset, conversation]);
 
-  if (isLoading) {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearOperationTimeout();
+    };
+  }, [clearOperationTimeout]);
+
+  if (conversationState === 'loading') {
     return (
       <div className="flex flex-col items-center gap-4 p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -109,29 +203,45 @@ export function ConvAI({ onMessage, onSpeakingChange, onStatusChange, disabled =
       </div>
     );
   }
+  
 
   return (
     <div className="flex flex-col items-center gap-6 p-8">
       {/* Conversation Orb */}
       <ConversationOrb
-        status={isActive ? (conversation.isSpeaking ? 'connected' : 'connected') : 'idle'}
-        isSpeaking={conversation.isSpeaking}
-        onClick={isActive ? stopConversation : startConversation}
-        disabled={!signedUrl || disabled}
+        status={isActive ? 'connected' : 'idle'}
+        isSpeaking={isSpeaking}
+        onClick={canStop ? stopConversation : canStart ? startConversation : () => {}}
+        disabled={!canStart && !canStop}
         size="lg"
       />
 
-      {/* Stop text - only show when active */}
-      {isActive && (
-        <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+      {/* Bottom text - always show something */}
+      <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+        {showCancelText ? (
           <span 
             onClick={stopConversation}
             className="text-[#6d28d9]/50 font-bold tracking-wide text-lg cursor-pointer hover:text-[#6d28d9]/70 transition-colors duration-200 select-none"
           >
             stop conversation
           </span>
-        </div>
-      )}
+        ) : (
+          <span 
+            onClick={() => {
+              // This will trigger the orb click
+              const orb = document.querySelector('[data-orb-button]') as HTMLButtonElement;
+              if (orb && !orb.disabled) {
+                orb.click();
+              }
+            }}
+            className="text-[#6d28d9]/50 font-bold tracking-wide text-lg cursor-pointer hover:text-[#6d28d9]/70 transition-colors duration-200 select-none"
+          >
+            Talk to AIR
+          </span>
+        )}
+      </div>
+
+
     </div>
   );
 }

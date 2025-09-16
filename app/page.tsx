@@ -13,19 +13,19 @@ import { ConvAI } from '@/components/ConvAI';
 import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 
 // Types
-export type AppState = 'idle' | 'listening' | 'processing' | 'speaking' | 'error';
+export type ConversationState = 'loading' | 'ready' | 'starting' | 'listening' | 'speaking' | 'stopping' | 'error';
 
 export default function Home() {
-  // State management
-  const [appState, setAppState] = useState<AppState>('idle');
+  // Conversation state management (source of truth)
+  const [conversationState, setConversationState] = useState<ConversationState>('loading');
+  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [status, setStatus] = useState<string>('Loading...');
+  
+  // Other state
   const [currentResponse, setCurrentResponse] = useState<string>('');
   const [audioAmplitude, setAudioAmplitude] = useState(0);
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('Ready');
   const [showModal, setShowModal] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
-  const [isAIAudioPlaying, setIsAIAudioPlaying] = useState(false);
-  const [isConversationReady, setIsConversationReady] = useState(false);
   
   // Auth and wallet
   const { ready } = usePrivy();
@@ -35,10 +35,10 @@ export default function Home() {
 
   // Initialize app state
   useEffect(() => {
-    setIsAIAudioPlaying(false);
-    setAppState('idle');
+    setIsSpeaking(false);
+    setConversationState('loading');
     setAudioAmplitude(0);
-    setStatus('Ready');
+    setStatus('Loading...');
     
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -54,36 +54,65 @@ export default function Home() {
       currentAudioRef.current.currentTime = 0;
       currentAudioRef.current = null;
     }
-    setIsAIAudioPlaying(false);
+    setIsSpeaking(false);
   }, []);
 
-  // Simple conversation handlers
+  // Conversation state handlers
+  const handleConversationStateChange = useCallback((newState: ConversationState) => {
+    console.log('Conversation state changed:', newState);
+    setConversationState(newState);
+    
+    // Update status based on state
+    switch (newState) {
+      case 'loading':
+        setStatus('Loading...');
+        break;
+      case 'ready':
+        setStatus('Ready');
+        break;
+      case 'starting':
+        setStatus('Starting...');
+        break;
+      case 'listening':
+        setStatus('Listening...');
+        break;
+      case 'speaking':
+        setStatus('Speaking...');
+        break;
+      case 'stopping':
+        setStatus('Stopping...');
+        break;
+      case 'error':
+        setStatus('Error');
+        break;
+    }
+  }, []);
+
+  const handleSpeakingChange = useCallback((speaking: boolean) => {
+    console.log('Speaking changed:', speaking);
+    setIsSpeaking(speaking);
+    setAudioAmplitude(speaking ? 0.5 : 0);
+    
+    // Update conversation state based on speaking
+    if (speaking && conversationState === 'listening') {
+      setConversationState('speaking');
+    } else if (!speaking && conversationState === 'speaking') {
+      setConversationState('listening');
+    }
+  }, [conversationState]);
+
   const handleMessage = useCallback((message: string) => {
     setCurrentResponse(message);
   }, []);
 
-  const handleSpeakingChange = useCallback((isSpeaking: boolean) => {
-    setIsAIAudioPlaying(isSpeaking);
-    setAppState(isSpeaking ? 'speaking' : 'idle');
-    setAudioAmplitude(isSpeaking ? 0.5 : 0);
-  }, []);
-
-  const handleStatusChange = useCallback((newStatus: string) => {
-    console.log('Status changing from', status, 'to', newStatus);
-    setStatus(newStatus);
-  }, [status]);
-
   // Modal handlers
   const handleCloseModal = useCallback(() => {
     setShowModal(false);
-    if (appState === 'speaking') {
+    if (conversationState === 'speaking') {
       stopCurrentAudio();
-      setAppState('idle');
-      setAudioAmplitude(0);
-      setStatus('Ready');
+      setConversationState('listening');
     }
-  }, [appState, stopCurrentAudio]);
-
+  }, [conversationState, stopCurrentAudio]);
 
   // Loading state
   if (!ready) {
@@ -94,9 +123,8 @@ export default function Home() {
     );
   }
 
-  // Computed values
-  const isConvAIDisabled = appState === 'processing' || appState === 'speaking';
-  const isSpeaking = isAIAudioPlaying;
+  // Computed values based on conversation state
+  const isConvAIDisabled = conversationState === 'loading' || conversationState === 'starting' || conversationState === 'stopping';
   
   return (
     <>
@@ -105,9 +133,11 @@ export default function Home() {
         {/* ElevenLabs Conversational AI */}
         <div className="flex-1 flex items-center justify-center w-full max-w-4xl px-4">
           <ConvAI 
+            conversationState={conversationState}
+            isSpeaking={isSpeaking}
             onMessage={handleMessage}
             onSpeakingChange={handleSpeakingChange}
-            onStatusChange={handleStatusChange}
+            onConversationStateChange={handleConversationStateChange}
             disabled={isConvAIDisabled}
           />
         </div>
@@ -134,23 +164,6 @@ export default function Home() {
         <GMButton />
         <SaveButton />
         
-        {/* Instruction Text - only show when ready */}
-        {status === 'Waiting' && (
-          <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20">
-            <span 
-              onClick={() => {
-                // This will trigger the orb click in ConvAI component
-                const orb = document.querySelector('[data-orb-button]') as HTMLButtonElement;
-                if (orb && !orb.disabled) {
-                  orb.click();
-                }
-              }}
-              className="text-[#6d28d9]/50 font-bold tracking-wide text-lg cursor-pointer hover:text-[#6d28d9]/70 transition-colors duration-200 select-none"
-            >
-              Talk to AIR
-            </span>
-          </div>
-        )}
       </main>
     </>
   );
