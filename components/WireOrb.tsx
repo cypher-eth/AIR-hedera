@@ -43,9 +43,14 @@ const Orb: React.FC<{
   const config = sizeConfig[size];
 
   useEffect(() => {
-    initViz();
+    // Use requestAnimationFrame to ensure DOM is ready and avoid blocking
+    const initTimeout = requestAnimationFrame(() => {
+      initViz();
+    });
+    
     window.addEventListener("resize", onWindowResize);
     return () => {
+      cancelAnimationFrame(initTimeout);
       window.removeEventListener("resize", onWindowResize);
     };
   }, []);
@@ -107,14 +112,17 @@ const Orb: React.FC<{
     // Apply smoothing to the core orb
     sphereGeometry.computeVertexNormals();
     
-    // Add subtle organic wave distortion to the core
+    // Add subtle organic wave distortion to the core (optimized)
     const positionAttribute = sphereGeometry.getAttribute('position');
     const positions = positionAttribute.array;
+    const vertexCount = positions.length / 3;
     
-    for (let i = 0; i < positions.length; i += 3) {
-      const x = positions[i];
-      const y = positions[i + 1];
-      const z = positions[i + 2];
+    // Process vertices in batches for better performance
+    for (let i = 0; i < vertexCount; i++) {
+      const idx = i * 3;
+      const x = positions[idx];
+      const y = positions[idx + 1];
+      const z = positions[idx + 2];
       
       // Calculate distance from center
       const distance = Math.sqrt(x * x + y * y + z * z);
@@ -268,14 +276,17 @@ const Orb: React.FC<{
       // Apply smoothing to remove hard edges
       auraGeometry.computeVertexNormals();
       
-      // Add subtle noise to vertices for organic wavy effect
+      // Add subtle noise to vertices for organic wavy effect (optimized)
       const positionAttribute = auraGeometry.getAttribute('position');
       const positions = positionAttribute.array;
+      const vertexCount = positions.length / 3;
       
-      for (let i = 0; i < positions.length; i += 3) {
-        const x = positions[i];
-        const y = positions[i + 1];
-        const z = positions[i + 2];
+      // Process vertices in batches for better performance
+      for (let i = 0; i < vertexCount; i++) {
+        const idx = i * 3;
+        const x = positions[idx];
+        const y = positions[idx + 1];
+        const z = positions[idx + 2];
         
         // Calculate distance from center
         const distance = Math.sqrt(x * x + y * y + z * z);
@@ -283,18 +294,14 @@ const Orb: React.FC<{
         const normalizedY = y / distance;
         const normalizedZ = z / distance;
         
-        // Add subtle wave distortion
-        const wave1 = Math.sin(normalizedX * 3.0) * Math.cos(normalizedY * 2.0) * 0.1;
-        const wave2 = Math.sin(normalizedY * 4.0) * Math.cos(normalizedZ * 3.0) * 0.08;
-        const wave3 = Math.sin(normalizedZ * 2.0) * Math.cos(normalizedX * 4.0) * 0.06;
-        
-        const waveOffset = (wave1 + wave2 + wave3) * config.radius * layer.radius;
+        // Simplified wave distortion for better performance
+        const waveOffset = (Math.sin(normalizedX * 3.0) * Math.cos(normalizedY * 2.0) * 0.1) * config.radius * layer.radius;
         const newDistance = distance + waveOffset;
         
         // Apply the wave distortion
-        positions[i] = normalizedX * newDistance;
-        positions[i + 1] = normalizedY * newDistance;
-        positions[i + 2] = normalizedZ * newDistance;
+        positions[idx] = normalizedX * newDistance;
+        positions[idx + 1] = normalizedY * newDistance;
+        positions[idx + 2] = normalizedZ * newDistance;
       }
       
       positionAttribute.needsUpdate = true;
