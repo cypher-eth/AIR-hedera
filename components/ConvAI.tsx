@@ -9,6 +9,7 @@ type ConversationState = 'loading' | 'ready' | 'starting' | 'listening' | 'speak
 interface ConvAIProps {
   conversationState: ConversationState;
   isSpeaking: boolean;
+  audioAmplitude?: number;
   onMessage?: (message: string) => void;
   onSpeakingChange?: (isSpeaking: boolean) => void;
   onConversationStateChange?: (state: ConversationState) => void;
@@ -18,9 +19,10 @@ interface ConvAIProps {
 export function ConvAI({ 
   conversationState, 
   isSpeaking, 
+  audioAmplitude,
   onMessage, 
   onSpeakingChange, 
-  onConversationStateChange, 
+  onConversationStateChange,
   disabled = false 
 }: ConvAIProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -214,7 +216,9 @@ export function ConvAI({
         onClick={canStop ? stopConversation : canStart ? startConversation : () => {}}
         disabled={!canStart && !canStop}
         size="lg"
+        audioAmplitude={audioAmplitude}
       />
+
 
       {/* Bottom text - always show something */}
       <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20">

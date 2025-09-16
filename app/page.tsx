@@ -3,14 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { ResponseModal } from '@/components/ResponseModal';
 import { usePrivy } from '@privy-io/react-auth';
-import { useAccount, useReadContract } from 'wagmi';
-import { parseAbiItem } from 'viem';
+
 import { Header } from '@/components/Header';
 import { GMButton } from '@/components/GMButton';
 import { SaveButton } from '@/components/SaveButton';
 import { BuyCreditsModal } from '@/components/BuyCreditsModal';
 import { ConvAI } from '@/components/ConvAI';
-import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 
 // Types
 export type ConversationState = 'loading' | 'ready' | 'starting' | 'listening' | 'speaking' | 'stopping' | 'error';
@@ -91,7 +89,11 @@ export default function Home() {
   const handleSpeakingChange = useCallback((speaking: boolean) => {
     console.log('Speaking changed:', speaking);
     setIsSpeaking(speaking);
-    setAudioAmplitude(speaking ? 0.5 : 0);
+    
+    // Reset amplitude when stopping
+    if (!speaking) {
+      setAudioAmplitude(0);
+    }
     
     // Update conversation state based on speaking
     if (speaking && conversationState === 'listening') {
@@ -100,6 +102,33 @@ export default function Home() {
       setConversationState('listening');
     }
   }, [conversationState]);
+
+  // Temporary output volume source (to be replaced with ElevenLabs real data)
+  useEffect(() => {
+    if (!isSpeaking) {
+      setAudioAmplitude(0);
+      return;
+    }
+
+    let rafId: number;
+    let lastUpdate = 0;
+    const UPDATE_INTERVAL = 300; // Update every 100ms instead of every frame
+
+    const loop = (now: number) => {
+      if (now - lastUpdate >= UPDATE_INTERVAL) {
+        // Temporary fake volume calculation
+        const t = now * 0.001;
+        const v = 0.35 + 0.25 * Math.sin(t * 2.2) + 0.15 * Math.sin(t * 5.3);
+        const volume = Math.max(0, Math.min(1, v));
+        setAudioAmplitude(volume);
+        lastUpdate = now;
+      }
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isSpeaking]);
 
   const handleMessage = useCallback((message: string) => {
     setCurrentResponse(message);
@@ -129,12 +158,14 @@ export default function Home() {
   return (
     <>
       <Header status={status} onOpenTopUp={() => setShowWaterModal(true)} />
-      <main className="min-h-screen flex flex-col items-center justify-center p-4">
+
+      <main className="h-screen flex flex-col items-center justify-center p-4 overflow-hidden">
         {/* ElevenLabs Conversational AI */}
         <div className="flex-1 flex items-center justify-center w-full max-w-4xl px-4">
           <ConvAI 
             conversationState={conversationState}
             isSpeaking={isSpeaking}
+            audioAmplitude={audioAmplitude}
             onMessage={handleMessage}
             onSpeakingChange={handleSpeakingChange}
             onConversationStateChange={handleConversationStateChange}
@@ -142,9 +173,10 @@ export default function Home() {
           />
         </div>
 
-        {/* Response Box placeholder */}
-        <div className="w-full max-w-4xl px-4 mb-40">
-          {/* ResponseBox component can be uncommented when needed */}
+        {/* Action Buttons - Mobile responsive */}
+        <div className="flex gap-4 mt-4 mb-2.5 flex-shrink-0">
+          <GMButton />
+          <SaveButton />
         </div>
 
         {/* Modals */}
@@ -159,10 +191,6 @@ export default function Home() {
           isOpen={showWaterModal} 
           onClose={() => setShowWaterModal(false)} 
         />
-        
-        {/* Action Buttons */}
-        <GMButton />
-        <SaveButton />
         
       </main>
     </>
