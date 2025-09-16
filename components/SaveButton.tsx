@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { Droplets } from 'lucide-react';
 import { useAccount, useReadContract } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { CREDIT_ADDRESS } from '@/app/constants/contracts';
 import { CREDIT_ABI_ARRAY } from '@/abis';
 import { BuyCreditsModal } from './BuyCreditsModal';
 
 export function SaveButton() {
   const { address, isConnected } = useAccount();
+  const { login, authenticated } = usePrivy();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Read CREDIT balance
@@ -50,6 +52,12 @@ export function SaveButton() {
   };
 
   const handleWaterClick = () => {
+    // Check if user is authenticated, if not prompt for login
+    if (!authenticated) {
+      login();
+      return;
+    }
+
     if (!isConnected || !address) {
       alert('Please connect your wallet first');
       return;

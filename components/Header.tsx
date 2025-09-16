@@ -77,11 +77,13 @@ export function Header({ status, onOpenTopUp }: HeaderProps) {
     <header className="fixed top-0 left-0 right-0 z-40 bg-black/20 backdrop-blur-sm border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
-          {/* Status - Always visible */}
+          {/* Status - Always visible, but hide "connected" status */}
           <div className="">
             <div className="bg-black/20 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
               <p className="text-center text-sm text-white/80">
-                Status: <span className="font-medium text-white">{status}</span>
+                Status: <span className="font-medium text-white">
+                  {status === 'Connected - Ready to chat' ? 'Ready' : status}
+                </span>
               </p>
             </div>
           </div>
