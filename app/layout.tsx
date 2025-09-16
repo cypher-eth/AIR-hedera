@@ -6,8 +6,8 @@ import { AppProviders } from '@/components/providers/AppProviders';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Hedera AirAgent',
-  description: 'Interactive AI support with voice interface and Web3 integration',
+  title: 'AIR Agent',
+  description: 'Interactive AI with transformational tools.',
 };
 
 export default function RootLayout({
