@@ -60,11 +60,14 @@ const Orb: React.FC<{
     ) {
       resetBallMorph(ballRef.current, originalPositionsRef.current);
       // Reset all aura layers
-      const baseOpacities = [0.08, 0.12, 0.15]; // More transparent hint colors (teal, salmon, purple)
+      const baseOpacities = [0.2, 0.25, 0.1]; // More visible layers (jelly, pink, purple)
       auraRefs.current.forEach((aura, index) => {
         if (aura) {
           aura.scale.setScalar(1);
-          (aura.material as THREE.MeshBasicMaterial).opacity = baseOpacities[index];
+          // Only update opacity if material exists (skip innermost layer)
+          if (aura.material) {
+            (aura.material as THREE.MeshBasicMaterial).opacity = baseOpacities[index];
+          }
         }
       });
     }
@@ -144,7 +147,7 @@ const Orb: React.FC<{
         color1: { value: new THREE.Color(0x8b5cf6) }, // Dark purple
         color2: { value: new THREE.Color(0x6b21a8) }, // Medium purple
         color3: { value: new THREE.Color(0x8b5cf6) }, // Soft violet
-        opacity: { value: 0.10 } // Much more transparent
+        opacity: { value: 0.25 } // Much more transparent
       },
       vertexShader: `
         uniform float time;
@@ -230,28 +233,28 @@ const Orb: React.FC<{
     // Create multiple layered auras with hint colors (biggest to smallest)
     const auraLayers = [
       { 
-        radius: 1.55, 
-        color: '#9966f1', // Teal green - biggest, furthest
-        opacity: 0.18, // More transparent
+        radius: 1.45, 
+        color: '#c996f1', // Teal green - biggest, furthest
+        opacity: 0.07, // 30% more transparent (0.1 * 0.7 = 0.07)
         geometry: 'sphere',
-        rotationSpeed: { x: 0.002, y: -0.001, z: 0.0008 },
-        zOffset: -0.6 // Furthest back
+        rotationSpeed: { x: 0.008, y: -0.004, z: 0.003 },
+        zOffset: 30 // Furthest back
       },
       { 
-        radius: 1.25, 
-        color: '#ec4899', // Hot pink - medium, more saturated
-        opacity: 0.12, // More transparent
+        radius: 1.35, 
+        color: '#e0f2fe', // Light blue glass color
+        opacity: 0.15, // More transparent for glass effect
         geometry: 'sphere',
-        rotationSpeed: { x: -0.0005, y: 0.0015, z: 0.002 },
-        zOffset: -0.3 // Pushed back
+        rotationSpeed: { x: -0.002, y: 0.006, z: 0.008 },
+        zOffset: 5 // Pushed back
       },
       { 
         radius: 1.05, 
         color: '#8b5cf6', // Purple - smallest, closest
-        opacity: 0.15, // More transparent
+        opacity: 0.05, // More visible
         geometry: 'sphere',
-        rotationSpeed: { x: 0.001, y: 0.002, z: 0.0005 },
-        zOffset: 0 // Closest to camera
+        rotationSpeed: { x: 0.004, y: 0.008, z: 0.002 },
+        zOffset: 1 // Closest to camera
       }
     ];
 
@@ -297,18 +300,54 @@ const Orb: React.FC<{
       positionAttribute.needsUpdate = true;
       auraGeometry.computeVertexNormals();
       
-      const auraMaterial = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(layer.color),
-        transparent: true,
-        opacity: layer.opacity,
-        blending: THREE.AdditiveBlending, // Additive blending for energy glow effect
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        wireframe: false,
-        alphaTest: 0.05 // Lower alpha test for smoother energy edges
-      });
+      // Create materials for different layers
+      const auraMaterial = index === 0 
+        ? new THREE.MeshPhysicalMaterial({
+            color: new THREE.Color(layer.color),
+            transparent: true,
+            opacity: layer.opacity * 1.2, // Adjusted for glassier effect
+            metalness: 0.3, // High metalness for pearlescent shine
+            roughness: 0.05, // Very smooth for glass-like clarity
+            transmission: 0.85, // High transmission for glass effect
+            thickness: 0.3, // Thinner for glass-like appearance
+            ior: 1.6, // Higher IOR for more dramatic refraction
+            clearcoat: 1.0, // Full clearcoat for maximum reflections
+            clearcoatRoughness: 0.02, // Very smooth clearcoat for sharp reflections
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            envMapIntensity: 2.5, // Much higher environment reflections
+            reflectivity: 0.4, // Very high reflectivity for glass
+            // Pearlescent properties
+            sheen: 0.8, // High sheen for pearlescent effect
+            sheenRoughness: 0.1, // Smooth sheen
+            sheenColor: new THREE.Color(0xf0e6ff) // Light purple sheen for pearlescent highlights
+          })
+        : index === 1
+        ? new THREE.MeshPhysicalMaterial({
+            color: new THREE.Color(layer.color),
+            transparent: true,
+            opacity: layer.opacity * 0.8, // Glass-like transparency
+            metalness: 0.0, // No metalness for pure glass
+            roughness: 0.0, // Perfectly smooth for glass clarity
+            transmission: 0.95, // Very high transmission for glass effect
+            thickness: 0.05, // Very thin for glass-like appearance
+            ior: 1.5, // Standard glass IOR
+            clearcoat: 0.0, // No clearcoat for pure glass
+            clearcoatRoughness: 0.0, // Smooth for glass
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            envMapIntensity: 0.8, // Subtle environment reflections
+            reflectivity: 0.1, // Low reflectivity for glass
+            blending: THREE.NormalBlending, // Normal blending for glass
+            alphaTest: 0.05,
+            // Glass properties
+            sheen: 0.0, // No sheen for glass
+            sheenRoughness: 0.0, // Smooth for glass
+            sheenColor: new THREE.Color(0xffffff) // White sheen for glass highlights
+          })
+        : null; // No material for innermost layer (index 2)
       
-      const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+      const aura = new THREE.Mesh(auraGeometry, auraMaterial || undefined);
       
       // Position the aura layer on the z-axis to prevent overlap
       aura.position.z = layer.zOffset;
@@ -323,12 +362,25 @@ const Orb: React.FC<{
     // Base scale to keep extra headroom for high distortion
     group.scale.setScalar(0.5);
 
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
     scene.add(ambientLight);
 
-    const pointLight = new THREE.PointLight(0xffffff, 1, 100);
-    pointLight.position.set(10, 10, 10);
-    scene.add(pointLight);
+    // Create multiple point lights positioned to avoid front eggshell patterns
+    const pointLight1 = new THREE.PointLight(0xffffff, 0.6, 100);
+    pointLight1.position.set(-15, 5, 8); // Left side lighting
+    scene.add(pointLight1);
+
+    const pointLight2 = new THREE.PointLight(0xffffff, 0.5, 100);
+    pointLight2.position.set(12, -8, 6); // Right side lighting
+    scene.add(pointLight2);
+
+    const pointLight3 = new THREE.PointLight(0xffffff, 0.4, 100);
+    pointLight3.position.set(0, 0, -20); // Back lighting for rim effect
+    scene.add(pointLight3);
+
+    const pointLight4 = new THREE.PointLight(0x8b5cf6, 0.3, 100); // Colored accent light
+    pointLight4.position.set(8, 12, -5); // Top accent
+    scene.add(pointLight4);
 
     scene.add(group);
 
@@ -356,8 +408,8 @@ const Orb: React.FC<{
     }
 
     // Rotate the core ball
-    ballRef.current.rotation.x += 0.01;
-    ballRef.current.rotation.y += 0.01;
+    ballRef.current.rotation.x += 0.02;
+    ballRef.current.rotation.y += 0.02;
 
     // Rotate each aura layer individually at different speeds
     auraRefs.current.forEach((aura) => {
@@ -437,10 +489,14 @@ const Orb: React.FC<{
         const auraScale = 1 + distortionWithTime * pattern.scaleIntensity * pattern.scaleMultiplier;
         aura.scale.setScalar(auraScale);
         
-        // Each layer has different opacity response with time variation (hint colors)
-        const baseOpacity = [0.08, 0.12, 0.15][index]; // More transparent hint colors (teal, salmon, purple)
-        const opacityWithTime = baseOpacity + distortionWithTime * pattern.opacityIntensity * pattern.opacityMultiplier * 0.3; // Reduced intensity for subtle hints
-        (aura.material as THREE.MeshBasicMaterial).opacity = Math.max(0.02, Math.min(0.25, opacityWithTime)); // Lower max opacity for subtle hints
+        // Each layer has different opacity response with time variation (more visible)
+        const baseOpacity = [0.4, 0.25, 0.3][index]; // More visible layers (jelly, pink, purple)
+        const opacityWithTime = baseOpacity + distortionWithTime * pattern.opacityIntensity * pattern.opacityMultiplier * 0.4; // Increased intensity for better visibility
+        
+        // Only update opacity if material exists (skip innermost layer)
+        if (aura.material) {
+          (aura.material as THREE.MeshBasicMaterial).opacity = Math.max(0.1, Math.min(0.5, opacityWithTime)); // Higher max opacity for better visibility
+        }
         
         // Add slight rotation variation for more organic movement
         const rotationVariation = distortionWithTime * 0.02 * (index + 1);
