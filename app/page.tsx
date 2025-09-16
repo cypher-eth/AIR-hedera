@@ -243,7 +243,7 @@ export default function Home() {
     <>
       <Header status={status} onOpenTopUp={() => setShowWaterModal(true)} />
 
-      <main className="h-screen flex flex-col items-center justify-center p-4 overflow-hidden">
+      <main className="h-screen flex flex-col p-4 overflow-hidden">
         {/* ElevenLabs Conversational AI */}
         <div className="flex-1 flex items-center justify-center w-full max-w-4xl px-4">
           <ConvAI 
