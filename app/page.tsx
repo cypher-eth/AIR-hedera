@@ -135,7 +135,7 @@ export default function Home() {
         <SaveButton />
         
         {/* Instruction Text - only show when ready */}
-        {status === 'Ready' && (
+        {status === 'Waiting' && (
           <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-20">
             <span 
               onClick={() => {
@@ -147,7 +147,7 @@ export default function Home() {
               }}
               className="text-[#6d28d9]/50 font-bold tracking-wide text-lg cursor-pointer hover:text-[#6d28d9]/70 transition-colors duration-200 select-none"
             >
-              speak to the AI
+              Talk to AIR
             </span>
           </div>
         )}
