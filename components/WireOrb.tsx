@@ -28,7 +28,7 @@ const Orb: React.FC<{
   const groupRef = useRef<THREE.Group | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const ballRef = useRef<THREE.Mesh | null>(null);
-  const auraRef = useRef<THREE.Mesh | null>(null);
+  const auraRefs = useRef<THREE.Mesh[]>([]); // Refs for multiple aura layers
   const originalPositionsRef = useRef<any | null>(null);
   const mountRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number | null>(null);
@@ -59,6 +59,14 @@ const Orb: React.FC<{
       originalPositionsRef.current
     ) {
       resetBallMorph(ballRef.current, originalPositionsRef.current);
+      // Reset all aura layers
+      const baseOpacities = [0.2, 0.15, 0.1]; // Increased for energy sphere effect
+      auraRefs.current.forEach((aura, index) => {
+        if (aura) {
+          aura.scale.setScalar(1);
+          (aura.material as THREE.MeshBasicMaterial).opacity = baseOpacities[index];
+        }
+      });
     }
   }, [distortion, isActive]);
 
@@ -90,16 +98,126 @@ const Orb: React.FC<{
 
     rendererRef.current = renderer;
 
-    const icosahedronGeometry = new THREE.IcosahedronGeometry(config.radius, 4);
-    const lambertMaterial = new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#3b82f6'), // blue
+    // Use ultra-high-resolution sphere for perfectly smooth core orb
+    const sphereGeometry = new THREE.SphereGeometry(config.radius * 0.8, 128, 128); // Ultra-high subdivision for maximum smoothness
+    
+    // Apply smoothing to the core orb
+    sphereGeometry.computeVertexNormals();
+    
+    // Add subtle organic wave distortion to the core
+    const positionAttribute = sphereGeometry.getAttribute('position');
+    const positions = positionAttribute.array;
+    
+    for (let i = 0; i < positions.length; i += 3) {
+      const x = positions[i];
+      const y = positions[i + 1];
+      const z = positions[i + 2];
+      
+      // Calculate distance from center
+      const distance = Math.sqrt(x * x + y * y + z * z);
+      const normalizedX = x / distance;
+      const normalizedY = y / distance;
+      const normalizedZ = z / distance;
+      
+      // Add subtle wave distortion for organic feel
+      const wave1 = Math.sin(normalizedX * 2.0) * Math.cos(normalizedY * 3.0) * 0.05;
+      const wave2 = Math.sin(normalizedY * 3.0) * Math.cos(normalizedZ * 2.0) * 0.04;
+      const wave3 = Math.sin(normalizedZ * 2.5) * Math.cos(normalizedX * 3.5) * 0.03;
+      
+      const waveOffset = (wave1 + wave2 + wave3) * config.radius;
+      const newDistance = distance + waveOffset;
+      
+      // Apply the wave distortion
+      positions[i] = normalizedX * newDistance;
+      positions[i + 1] = normalizedY * newDistance;
+      positions[i + 2] = normalizedZ * newDistance;
+    }
+    
+    positionAttribute.needsUpdate = true;
+    sphereGeometry.computeVertexNormals();
+    
+    // Create a magical gradient material for the core orb
+    const gradientMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        distortion: { value: 0 },
+        color1: { value: new THREE.Color(0x8b5cf6) }, // Dark purple
+        color2: { value: new THREE.Color(0x6b21a8) }, // Medium purple
+        color3: { value: new THREE.Color(0x8b5cf6) }, // Soft violet
+        opacity: { value: 0.10 } // Much more transparent
+      },
+      vertexShader: `
+        uniform float time;
+        uniform float distortion;
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying float vDistortion;
+        
+        void main() {
+          vPosition = position;
+          vNormal = normal;
+          vDistortion = distortion;
+          
+          // No vertex displacement - keep perfectly smooth sphere
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform float distortion;
+        uniform vec3 color1;
+        uniform vec3 color2;
+        uniform vec3 color3;
+        uniform float opacity;
+        varying vec3 vPosition;
+        varying vec3 vNormal;
+        varying float vDistortion;
+        
+        void main() {
+          // Create simple, smooth gradient based on Y position (no complex patterns)
+          vec3 normal = normalize(vNormal);
+          
+          // Simple vertical gradient from top to bottom
+          float gradient = (normal.y + 1.0) * 0.5;
+          
+          // Add gentle time-based color shifting
+          float timeShift = sin(time * 0.3) * 0.1;
+          gradient += timeShift;
+          gradient = clamp(gradient, 0.0, 1.0);
+          
+          // Create smooth tri-color gradient
+          vec3 color;
+          if (gradient < 0.5) {
+            float t = gradient * 2.0;
+            color = mix(color1, color2, t);
+          } else {
+            float t = (gradient - 0.5) * 2.0;
+            color = mix(color2, color3, t);
+          }
+          
+          // Add very subtle energy shimmer (no position-based patterns)
+          float shimmer = sin(time * 1.0) * 0.01 * vDistortion;
+          color += vec3(shimmer);
+          
+          // Add subtle rim lighting for energy glow
+          float rim = 1.0 - max(0.0, dot(normal, vec3(0.0, 0.0, 1.0)));
+          rim = smoothstep(0.7, 1.0, rim);
+          color += rim * 0.03 * vDistortion;
+          
+          // Darken the overall color to prevent bright white appearance
+          color *= 0.8;
+          
+          // Final opacity
+          float finalOpacity = opacity * 0.8;
+          
+          gl_FragColor = vec4(color, finalOpacity);
+        }
+      `,
       transparent: true,
-      opacity: 0.7,
-      roughness: 0.35,
-      metalness: 0.15
+      side: THREE.DoubleSide
     });
 
-    const ball = new THREE.Mesh(icosahedronGeometry, lambertMaterial);
+    const ball = new THREE.Mesh(sphereGeometry, gradientMaterial);
     ball.position.set(0, 0, 0);
     ballRef.current = ball;
 
@@ -109,19 +227,98 @@ const Orb: React.FC<{
 
     group.add(ball);
 
-    // Aura (soft outer glow)
-    const auraGeometry = new THREE.SphereGeometry(config.radius * 1.15, 32, 32);
-    const auraMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color('#60a5fa'),
-      transparent: true,
-      opacity: 0.35,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide
+    // Create multiple layered auras as smooth energy spheres (no geometric patterns)
+    const auraLayers = [
+      { 
+        radius: 1.05, 
+        color: '#6366f1', // Elegant indigo - closest
+        opacity: 0.1, // Increased for better visibility
+        geometry: 'sphere',
+        rotationSpeed: { x: 0.001, y: 0.002, z: 0.0005 },
+        zOffset: 0 // Closest to camera
+      },
+      { 
+        radius: 1.25, 
+        color: '#8b5cf6', // Soft violet - medium
+        opacity: 0.15, // Increased for better visibility
+        geometry: 'sphere',
+        rotationSpeed: { x: -0.0005, y: 0.0015, z: 0.002 },
+        zOffset: -0.3 // Pushed back
+      },
+      { 
+        radius: 1.55, 
+        color: '#c084fc', // Light lavender - furthest
+        opacity: 0.1, // Increased for better visibility
+        geometry: 'sphere',
+        rotationSpeed: { x: 0.002, y: -0.001, z: 0.0008 },
+        zOffset: -0.6 // Furthest back
+      }
+    ];
+
+    auraRefs.current = [];
+    auraLayers.forEach((layer, index) => {
+      let auraGeometry;
+      
+      // Use smooth spheres for all aura layers to avoid geometric patterns and pole defects
+      auraGeometry = new THREE.SphereGeometry(config.radius * layer.radius, 64, 64); // High subdivision for smooth energy spheres
+      
+      // Apply smoothing to remove hard edges
+      auraGeometry.computeVertexNormals();
+      
+      // Add subtle noise to vertices for organic wavy effect
+      const positionAttribute = auraGeometry.getAttribute('position');
+      const positions = positionAttribute.array;
+      
+      for (let i = 0; i < positions.length; i += 3) {
+        const x = positions[i];
+        const y = positions[i + 1];
+        const z = positions[i + 2];
+        
+        // Calculate distance from center
+        const distance = Math.sqrt(x * x + y * y + z * z);
+        const normalizedX = x / distance;
+        const normalizedY = y / distance;
+        const normalizedZ = z / distance;
+        
+        // Add subtle wave distortion
+        const wave1 = Math.sin(normalizedX * 3.0) * Math.cos(normalizedY * 2.0) * 0.1;
+        const wave2 = Math.sin(normalizedY * 4.0) * Math.cos(normalizedZ * 3.0) * 0.08;
+        const wave3 = Math.sin(normalizedZ * 2.0) * Math.cos(normalizedX * 4.0) * 0.06;
+        
+        const waveOffset = (wave1 + wave2 + wave3) * config.radius * layer.radius;
+        const newDistance = distance + waveOffset;
+        
+        // Apply the wave distortion
+        positions[i] = normalizedX * newDistance;
+        positions[i + 1] = normalizedY * newDistance;
+        positions[i + 2] = normalizedZ * newDistance;
+      }
+      
+      positionAttribute.needsUpdate = true;
+      auraGeometry.computeVertexNormals();
+      
+      const auraMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color(layer.color),
+        transparent: true,
+        opacity: layer.opacity,
+        blending: THREE.AdditiveBlending, // Additive blending for energy glow effect
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        wireframe: false,
+        alphaTest: 0.05 // Lower alpha test for smoother energy edges
+      });
+      
+      const aura = new THREE.Mesh(auraGeometry, auraMaterial);
+      
+      // Position the aura layer on the z-axis to prevent overlap
+      aura.position.z = layer.zOffset;
+      
+      // Store rotation speed for this layer
+      (aura as any).rotationSpeed = layer.rotationSpeed;
+      
+      auraRefs.current.push(aura);
+      group.add(aura);
     });
-    const aura = new THREE.Mesh(auraGeometry, auraMaterial);
-    auraRef.current = aura;
-    group.add(aura);
 
     // Base scale to keep extra headroom for high distortion
     group.scale.setScalar(0.5);
@@ -149,9 +346,28 @@ const Orb: React.FC<{
       return;
     }
 
-    // Rotate the ball
+    const time = Date.now() * 0.001;
+
+    // Update shader uniforms for magical gradient effect
+    if (ballRef.current.material && (ballRef.current.material as any).uniforms) {
+      const material = ballRef.current.material as THREE.ShaderMaterial;
+      material.uniforms.time.value = time;
+      material.uniforms.distortion.value = distortion;
+    }
+
+    // Rotate the core ball
     ballRef.current.rotation.x += 0.01;
     ballRef.current.rotation.y += 0.01;
+
+    // Rotate each aura layer individually at different speeds
+    auraRefs.current.forEach((aura) => {
+      if (aura && (aura as any).rotationSpeed) {
+        const speed = (aura as any).rotationSpeed;
+        aura.rotation.x += speed.x;
+        aura.rotation.y += speed.y;
+        aura.rotation.z += speed.z;
+      }
+    });
 
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     animationRef.current = requestAnimationFrame(render);
@@ -159,10 +375,10 @@ const Orb: React.FC<{
 
   const onWindowResize = () => {
     if (!cameraRef.current || !rendererRef.current) return;
-    
+
     rendererRef.current.setSize(config.width, config.height);
-    cameraRef.current.aspect = 1;
-    cameraRef.current.updateProjectionMatrix();
+      cameraRef.current.aspect = 1;
+      cameraRef.current.updateProjectionMatrix();
   };
 
   const updateBallMorph = (mesh: THREE.Mesh, distortionLevel: number) => {
@@ -175,18 +391,65 @@ const Orb: React.FC<{
     // Clamp distortion to a reasonable range (0-1)
     const clampedDistortion = Math.max(0, Math.min(1, distortionLevel));
     
-    // Scale down the distortion for more subtle morphing
-    const scaledDistortion = clampedDistortion * 0.3;
+    // Scale up the distortion for more dramatic morphing (doubled)
+    const scaledDistortion = clampedDistortion * 0.6;
     
     const time = Date.now() * 0.001;
 
-    // Subtle breathing/expansion for the aura based on distortion
-    if (auraRef.current) {
-      const auraScale = 1 + clampedDistortion * 0.15;
-      auraRef.current.scale.setScalar(auraScale);
-      (auraRef.current.material as THREE.MeshBasicMaterial).opacity = 0.25 + clampedDistortion * 0.25;
-    }
-    
+    // Enhanced breathing/expansion for all aura layers with varied distortion patterns
+    auraRefs.current.forEach((aura, index) => {
+      if (aura) {
+        // Each layer has unique distortion characteristics (reduced to prevent overlap)
+        const distortionPatterns = [
+          // Blue octahedron - subtle pulsing
+          { 
+            scaleMultiplier: 1.0, 
+            scaleIntensity: 0.15, // Reduced from 0.2
+            opacityMultiplier: 1.0, 
+            opacityIntensity: 0.2, // Reduced from 0.3
+            timeOffset: 0
+          },
+          // Purple dodecahedron - medium pulsing with rotation
+          { 
+            scaleMultiplier: 1.1, // Reduced from 1.2
+            scaleIntensity: 0.25, // Reduced from 0.4
+            opacityMultiplier: 1.2, // Reduced from 1.3
+            opacityIntensity: 0.3, // Reduced from 0.5
+            timeOffset: 1.5
+          },
+          // Pink icosahedron - dramatic pulsing
+          { 
+            scaleMultiplier: 1.3, // Reduced from 1.5
+            scaleIntensity: 0.35, // Reduced from 0.6
+            opacityMultiplier: 1.4, // Reduced from 1.8
+            opacityIntensity: 0.4, // Reduced from 0.7
+            timeOffset: 3.0
+          }
+        ];
+        
+        const pattern = distortionPatterns[index];
+        
+        // Add time-based variation for organic movement
+        const timeVariation = Math.sin(time + pattern.timeOffset) * 0.1;
+        const distortionWithTime = clampedDistortion + timeVariation;
+        
+        // Each layer scales with different intensity and patterns
+        const auraScale = 1 + distortionWithTime * pattern.scaleIntensity * pattern.scaleMultiplier;
+        aura.scale.setScalar(auraScale);
+        
+        // Each layer has different opacity response with time variation (energy sphere effect)
+        const baseOpacity = [0.2, 0.15, 0.1][index]; // Increased base opacity for energy spheres
+        const opacityWithTime = baseOpacity + distortionWithTime * pattern.opacityIntensity * pattern.opacityMultiplier * 0.4; // Increased intensity for energy effect
+        (aura.material as THREE.MeshBasicMaterial).opacity = Math.max(0.05, Math.min(0.35, opacityWithTime)); // Higher max opacity for energy spheres
+        
+        // Add slight rotation variation for more organic movement
+        const rotationVariation = distortionWithTime * 0.02 * (index + 1);
+        aura.rotation.x += rotationVariation * Math.sin(time * 0.5);
+        aura.rotation.y += rotationVariation * Math.cos(time * 0.7);
+        aura.rotation.z += rotationVariation * Math.sin(time * 0.3);
+      }
+    });
+
     for (let i = 0; i < positionAttribute.count; i++) {
       // Get original vertex position
       const originalX = originalPositions[i * 3];
@@ -204,15 +467,15 @@ const Orb: React.FC<{
         vertex.z + time * 0.01
       );
       
-      // More controlled morphing with better range
-      const morphAmount = noiseValue * scaledDistortion * 2;
+      // Enhanced morphing with doubled range
+      const morphAmount = noiseValue * scaledDistortion * 4;
       const distance = config.radius + morphAmount;
       vertex.multiplyScalar(distance);
-      
+
       // Update position
       positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
-    
+
     positionAttribute.needsUpdate = true;
   };
 

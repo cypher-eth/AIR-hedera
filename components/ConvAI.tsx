@@ -10,9 +10,11 @@ interface ConvAIProps {
   conversationState: ConversationState;
   isSpeaking: boolean;
   audioAmplitude?: number;
+  signedUrl?: string | null;
   onMessage?: (message: string) => void;
   onSpeakingChange?: (isSpeaking: boolean) => void;
   onConversationStateChange?: (state: ConversationState) => void;
+  onConversationReady?: (conversation: any) => void;
   disabled?: boolean;
 }
 
@@ -20,12 +22,14 @@ export function ConvAI({
   conversationState, 
   isSpeaking, 
   audioAmplitude,
+  signedUrl: propSignedUrl,
   onMessage, 
   onSpeakingChange, 
   onConversationStateChange,
+  onConversationReady,
   disabled = false 
 }: ConvAIProps) {
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(propSignedUrl || null);
   const operationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const conversation = useConversation({
@@ -48,6 +52,13 @@ export function ConvAI({
       onConversationStateChange?.('error');
     },
   });
+
+  // Pass conversation object to parent for volume calculation
+  useEffect(() => {
+    if (conversation && onConversationReady) {
+      onConversationReady(conversation);
+    }
+  }, [conversation, onConversationReady]);
 
   // Debug logging for state and status
   console.log('ConvAI Debug:', {
@@ -103,25 +114,28 @@ export function ConvAI({
     }
   }, [conversation.isSpeaking, conversation.status, conversationState, onSpeakingChange, onConversationStateChange]);
 
-  // Fetch signed URL on component mount
+  // Update signed URL when prop changes or fetch if not provided
   useEffect(() => {
-    const fetchSignedUrl = async () => {
-      try {
-        const response = await fetch('/api/get-signed-url');
-        if (!response.ok) {
-          throw new Error('Failed to fetch signed URL');
+    if (propSignedUrl) {
+      setSignedUrl(propSignedUrl);
+    } else if (!signedUrl) {
+      // Fallback: fetch signed URL if not provided as prop
+      const fetchSignedUrl = async () => {
+        try {
+          const response = await fetch('/api/get-signed-url');
+          if (!response.ok) {
+            throw new Error('Failed to fetch signed URL');
+          }
+          const data = await response.json();
+          setSignedUrl(data.signedUrl);
+        } catch (error) {
+          console.error('Failed to fetch signed URL:', error);
         }
-        const data = await response.json();
-        setSignedUrl(data.signedUrl);
-        onConversationStateChange?.('ready');
-      } catch (error) {
-        console.error('Failed to fetch signed URL:', error);
-        onConversationStateChange?.('error');
-      }
-    };
+      };
 
-    fetchSignedUrl();
-  }, [onConversationStateChange]);
+      fetchSignedUrl();
+    }
+  }, [propSignedUrl, signedUrl]);
 
   // Auto-reset if stuck in starting/stopping state
   useEffect(() => {
@@ -160,11 +174,24 @@ export function ConvAI({
       console.log('Starting conversation...');
       onConversationStateChange?.('starting');
       
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request microphone permission with optimized settings for faster startup
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000 // Lower sample rate for faster processing
+        } 
+      });
+      
+      // Start conversation immediately after getting permission
       await conversation.startSession({
         signedUrl,
         connectionType: 'websocket'
       });
+      
+      // Stop the stream immediately to avoid holding it unnecessarily
+      stream.getTracks().forEach(track => track.stop());
     } catch (error) {
       console.error('Failed to start conversation:', error);
       forceReset();

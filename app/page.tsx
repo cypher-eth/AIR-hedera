@@ -24,6 +24,19 @@ export default function Home() {
   const [audioAmplitude, setAudioAmplitude] = useState(0);
   const [showModal, setShowModal] = useState(false);
   const [showWaterModal, setShowWaterModal] = useState(false);
+  const [conversation, setConversation] = useState<any>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  
+  // Cache for conversation state to avoid re-initialization delays
+  const conversationCacheRef = useRef<{
+    signedUrl: string | null;
+    lastFetch: number;
+    conversation: any;
+  }>({
+    signedUrl: null,
+    lastFetch: 0,
+    conversation: null
+  });
   
   // Auth and wallet
   const { ready } = usePrivy();
@@ -31,7 +44,7 @@ export default function Home() {
   // Refs
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize app state
+  // Initialize app state and preload signed URL
   useEffect(() => {
     setIsSpeaking(false);
     setConversationState('loading');
@@ -43,6 +56,54 @@ export default function Home() {
       currentAudioRef.current.currentTime = 0;
       currentAudioRef.current = null;
     }
+
+    // Restore from cache if available
+    const cache = conversationCacheRef.current;
+    if (cache.signedUrl) {
+      console.log('Restoring from cache');
+      setSignedUrl(cache.signedUrl);
+      setConversationState('ready');
+      setStatus('Ready');
+    }
+    if (cache.conversation) {
+      setConversation(cache.conversation);
+    }
+
+    // Preload signed URL with caching for faster conversation startup
+    const preloadSignedUrl = async () => {
+      const now = Date.now();
+      const cache = conversationCacheRef.current;
+      
+      // Only fetch if not already cached or cache is expired
+      if (!cache.signedUrl || (now - cache.lastFetch) >= 300000) {
+        try {
+          console.log('Fetching fresh signed URL');
+          const response = await fetch('/api/get-signed-url');
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Update cache
+            cache.signedUrl = data.signedUrl;
+            cache.lastFetch = now;
+            
+            setSignedUrl(data.signedUrl);
+            setConversationState('ready');
+            setStatus('Ready');
+          } else {
+            setConversationState('error');
+            setStatus('Error');
+          }
+        } catch (error) {
+          console.error('Failed to preload signed URL:', error);
+          setConversationState('error');
+          setStatus('Error');
+        }
+      } else {
+        console.log('Using cached signed URL');
+      }
+    };
+
+    preloadSignedUrl();
   }, []);
 
   // Audio control
@@ -103,24 +164,41 @@ export default function Home() {
     }
   }, [conversationState]);
 
-  // Temporary output volume source (to be replaced with ElevenLabs real data)
+  // Real ElevenLabs output volume calculation
   useEffect(() => {
-    if (!isSpeaking) {
+    if (!isSpeaking || !conversation) {
       setAudioAmplitude(0);
       return;
     }
 
     let rafId: number;
     let lastUpdate = 0;
-    const UPDATE_INTERVAL = 300; // Update every 100ms instead of every frame
+    const UPDATE_INTERVAL = 100; // Update every 100ms for smooth visualization
 
     const loop = (now: number) => {
       if (now - lastUpdate >= UPDATE_INTERVAL) {
-        // Temporary fake volume calculation
-        const t = now * 0.001;
-        const v = 0.35 + 0.25 * Math.sin(t * 2.2) + 0.15 * Math.sin(t * 5.3);
-        const volume = Math.max(0, Math.min(1, v));
-        setAudioAmplitude(volume);
+        try {
+          // Get real volume data from ElevenLabs
+          if (conversation.getOutputByteFrequencyData) {
+            const frequencyData = conversation.getOutputByteFrequencyData();
+            if (frequencyData && frequencyData.length > 0) {
+              // Calculate volume using arithmetic mean as specified
+              const sum = Array.from(frequencyData).reduce((acc, byte) => acc + byte, 0);
+              const volume = sum / frequencyData.length;
+              // Normalize from 0-255 range to 0-1 range
+              const normalizedVolume = volume / 255;
+              setAudioAmplitude(normalizedVolume);
+            } else {
+              setAudioAmplitude(0);
+            }
+          } else {
+            // Fallback if method not available
+            setAudioAmplitude(0);
+          }
+        } catch (error) {
+          console.warn('Error getting ElevenLabs volume data:', error);
+          setAudioAmplitude(0);
+        }
         lastUpdate = now;
       }
       rafId = requestAnimationFrame(loop);
@@ -128,10 +206,16 @@ export default function Home() {
     rafId = requestAnimationFrame(loop);
 
     return () => cancelAnimationFrame(rafId);
-  }, [isSpeaking]);
+  }, [isSpeaking, conversation]);
 
   const handleMessage = useCallback((message: string) => {
     setCurrentResponse(message);
+  }, []);
+
+  const handleConversationReady = useCallback((conv: any) => {
+    // Cache the conversation object to avoid re-initialization
+    conversationCacheRef.current.conversation = conv;
+    setConversation(conv);
   }, []);
 
   // Modal handlers
@@ -166,9 +250,11 @@ export default function Home() {
             conversationState={conversationState}
             isSpeaking={isSpeaking}
             audioAmplitude={audioAmplitude}
+            signedUrl={signedUrl}
             onMessage={handleMessage}
             onSpeakingChange={handleSpeakingChange}
             onConversationStateChange={handleConversationStateChange}
+            onConversationReady={handleConversationReady}
             disabled={isConvAIDisabled}
           />
         </div>
