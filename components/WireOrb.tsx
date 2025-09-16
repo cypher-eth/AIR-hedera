@@ -60,7 +60,7 @@ const Orb: React.FC<{
     ) {
       resetBallMorph(ballRef.current, originalPositionsRef.current);
       // Reset all aura layers
-      const baseOpacities = [0.2, 0.15, 0.1]; // Increased for energy sphere effect
+      const baseOpacities = [0.08, 0.12, 0.15]; // More transparent hint colors (teal, salmon, purple)
       auraRefs.current.forEach((aura, index) => {
         if (aura) {
           aura.scale.setScalar(1);
@@ -227,31 +227,31 @@ const Orb: React.FC<{
 
     group.add(ball);
 
-    // Create multiple layered auras as smooth energy spheres (no geometric patterns)
+    // Create multiple layered auras with hint colors (biggest to smallest)
     const auraLayers = [
       { 
-        radius: 1.05, 
-        color: '#6366f1', // Elegant indigo - closest
-        opacity: 0.1, // Increased for better visibility
+        radius: 1.55, 
+        color: '#9966f1', // Teal green - biggest, furthest
+        opacity: 0.18, // More transparent
         geometry: 'sphere',
-        rotationSpeed: { x: 0.001, y: 0.002, z: 0.0005 },
-        zOffset: 0 // Closest to camera
+        rotationSpeed: { x: 0.002, y: -0.001, z: 0.0008 },
+        zOffset: -0.6 // Furthest back
       },
       { 
         radius: 1.25, 
-        color: '#8b5cf6', // Soft violet - medium
-        opacity: 0.15, // Increased for better visibility
+        color: '#ec4899', // Hot pink - medium, more saturated
+        opacity: 0.12, // More transparent
         geometry: 'sphere',
         rotationSpeed: { x: -0.0005, y: 0.0015, z: 0.002 },
         zOffset: -0.3 // Pushed back
       },
       { 
-        radius: 1.55, 
-        color: '#c084fc', // Light lavender - furthest
-        opacity: 0.1, // Increased for better visibility
+        radius: 1.05, 
+        color: '#8b5cf6', // Purple - smallest, closest
+        opacity: 0.15, // More transparent
         geometry: 'sphere',
-        rotationSpeed: { x: 0.002, y: -0.001, z: 0.0008 },
-        zOffset: -0.6 // Furthest back
+        rotationSpeed: { x: 0.001, y: 0.002, z: 0.0005 },
+        zOffset: 0 // Closest to camera
       }
     ];
 
@@ -437,10 +437,10 @@ const Orb: React.FC<{
         const auraScale = 1 + distortionWithTime * pattern.scaleIntensity * pattern.scaleMultiplier;
         aura.scale.setScalar(auraScale);
         
-        // Each layer has different opacity response with time variation (energy sphere effect)
-        const baseOpacity = [0.2, 0.15, 0.1][index]; // Increased base opacity for energy spheres
-        const opacityWithTime = baseOpacity + distortionWithTime * pattern.opacityIntensity * pattern.opacityMultiplier * 0.4; // Increased intensity for energy effect
-        (aura.material as THREE.MeshBasicMaterial).opacity = Math.max(0.05, Math.min(0.35, opacityWithTime)); // Higher max opacity for energy spheres
+        // Each layer has different opacity response with time variation (hint colors)
+        const baseOpacity = [0.08, 0.12, 0.15][index]; // More transparent hint colors (teal, salmon, purple)
+        const opacityWithTime = baseOpacity + distortionWithTime * pattern.opacityIntensity * pattern.opacityMultiplier * 0.3; // Reduced intensity for subtle hints
+        (aura.material as THREE.MeshBasicMaterial).opacity = Math.max(0.02, Math.min(0.25, opacityWithTime)); // Lower max opacity for subtle hints
         
         // Add slight rotation variation for more organic movement
         const rotationVariation = distortionWithTime * 0.02 * (index + 1);
